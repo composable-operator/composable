@@ -14,7 +14,7 @@ spec:
       instancename: mymessagehub
       service: Event Streams
       plan: 
-        lateValue:
+        getValueFrom:
           secretKeyRef: 
             name: mysecret
             key: plan-name
