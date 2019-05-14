@@ -1,0 +1,9 @@
+apiVersion: ibmcloud.ibm.com/v1alpha1
+kind: Composable
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: comp
+spec:
+  # Add fields here
+  foo: bar
