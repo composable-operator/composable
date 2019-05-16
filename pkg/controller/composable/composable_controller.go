@@ -25,6 +25,7 @@ import (
 
 	ibmcloudv1alpha1 "github.ibm.com/seed/composable/pkg/apis/ibmcloud/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,6 +38,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
+
+const getValueFrom = "getValueFrom"
 
 /**
 * USER ACTION REQUIRED: This is a scaffold file intended for the user to modify with their own Controller
@@ -101,13 +104,92 @@ func toJSONFromRaw(content *runtime.RawExtension) (interface{}, error) {
 	return data, nil
 }
 
-func resolve(object interface{}) unstructured.Unstructured {
-	//TODO: if namespace is undefined, then define it
-	obj := object.(map[string]interface{})
+func resolve(r *ReconcileComposable, object interface{}, composableNamespace string) (unstructured.Unstructured, error) {
+	// Set namespace if undefined
+	objMap := object.(map[string]interface{})
+	if _, ok := objMap["metadata"]; !ok {
+		return unstructured.Unstructured{}, fmt.Errorf("Template has no metadata section")
+	}
+	if metadata, ok := objMap["metadata"].(map[string]interface{}); ok {
+		if _, ok := metadata["namespace"]; !ok {
+			metadata["namespace"] = composableNamespace
+		}
+	} else {
+		return unstructured.Unstructured{}, fmt.Errorf("Template has an ill-defined metadata section")
+	}
+
+	obj, err := resolveFields(r, object.(map[string]interface{}), composableNamespace)
+	if err != nil {
+		return unstructured.Unstructured{}, err
+	}
 	ret := unstructured.Unstructured{
 		Object: obj,
 	}
-	return ret
+	return ret, nil
+}
+
+func resolveFields(r *ReconcileComposable, fields map[string]interface{}, composableNamespace string) (map[string]interface{}, error) {
+	for k, v := range fields {
+		if values, ok := v.(map[string]interface{}); ok {
+			if value, ok := values[getValueFrom]; ok {
+				if len(values) > 1 {
+					return nil, fmt.Errorf("Template is ill-formed. GetValueFrom must be the only field in a value")
+				}
+				resolvedValue, err := resolveValue(r, value, composableNamespace)
+				if err != nil {
+					return nil, err
+				}
+				fields[k] = resolvedValue
+			} else {
+				newFields, err := resolveFields(r, values, composableNamespace)
+				if err != nil {
+					return nil, err
+				}
+				fields[k] = newFields
+			}
+		}
+	}
+	return fields, nil
+}
+
+func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace string) (string, error) {
+	log.Println("here")
+	if val, ok := value.(map[string]interface{}); ok {
+		if obj, ok := val["secretKeyRef"]; ok {
+			if objmap, ok := obj.(map[string]interface{}); ok {
+				name, ok := objmap["name"].(string)
+				if !ok {
+					return "", fmt.Errorf("GetValueFrom is not well-formed, missing name for secretKeyRef")
+				}
+				key, ok := objmap["key"].(string)
+				if !ok {
+					return "", fmt.Errorf("GetValueFrom is not well-formed, missing key for secretKeyRef")
+				}
+				namespace, ok := objmap["namespace"].(string)
+				if !ok {
+					namespace = composableNamespace
+				}
+				secretNamespacedname := types.NamespacedName{Namespace: namespace, Name: name}
+				secret := &v1.Secret{}
+
+				err := r.Get(context.TODO(), secretNamespacedname, secret)
+				if err != nil {
+					return "", err
+				}
+				secretData := secret.Data[key]
+				log.Printf("****** plan is: %s", string(secretData))
+				return string(secretData), nil
+
+			}
+			return "", fmt.Errorf("GetValueFrom is not well-formed, secretKeyRef is not a map")
+			// }
+			// else if obj, ok := val["configMapKeyRef"]; ok {
+
+		} else {
+			return "", fmt.Errorf("GetValueFrom is not well-formed")
+		}
+	}
+	return "", fmt.Errorf("GetValueFrom is not well-formed")
 }
 
 func getName(obj map[string]interface{}) (string, error) {
@@ -149,10 +231,15 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 
 	object, err := toJSONFromRaw(instance.Spec.Template)
 	if err != nil {
+		log.Printf("Failed to read template data: %s\n" + err.Error())
 		return reconcile.Result{}, err
 	}
 
-	resource := resolve(object)
+	resource, err := resolve(r, object, instance.Namespace)
+	if err != nil {
+		log.Printf("Failed to resolve template: %s\n" + err.Error())
+		return reconcile.Result{}, err
+	}
 	log.Println(resource)
 
 	name, err := getName(resource.Object)

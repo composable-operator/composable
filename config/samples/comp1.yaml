@@ -16,6 +16,4 @@ spec:
       plan: 
         getValueFrom:
           secretKeyRef: 
-            name: mysecret
-            key: plan-name
-            
+           
