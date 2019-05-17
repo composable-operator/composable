@@ -12,6 +12,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager github.ibm.com/
 
 # Copy the controller-manager into a thin image
 FROM ubuntu:latest
-WORKDIR /root/
+RUN apt-get update && apt-get install --no-install-recommends -y ca-certificates && rm -rf /var/lib/apt/lists/*
+WORKDIR /
 COPY --from=builder /go/src/github.ibm.com/seed/composable/manager .
 ENTRYPOINT ["./manager"]
