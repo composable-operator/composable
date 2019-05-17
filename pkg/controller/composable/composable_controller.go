@@ -155,6 +155,8 @@ func resolveFields(r *ReconcileComposable, fields map[string]interface{}, compos
 
 func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace string) (string, error) {
 	if val, ok := value.(map[string]interface{}); ok {
+
+		// SecretRef
 		if obj, ok := val["secretKeyRef"]; ok {
 			if objmap, ok := obj.(map[string]interface{}); ok {
 				name, ok := objmap["name"].(string)
@@ -181,9 +183,33 @@ func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace
 
 			}
 			return "", fmt.Errorf("Failed: GetValueFrom is not well-formed, secretKeyRef is not a map")
-			// }
-			// else if obj, ok := val["configMapKeyRef"]; ok {
 
+			// ConfigMapRef
+		} else if obj, ok := val["configMapRef"]; ok {
+			if objmap, ok := obj.(map[string]interface{}); ok {
+				name, ok := objmap["name"].(string)
+				if !ok {
+					return "", fmt.Errorf("Failed: GetValueFrom is not well-formed, missing name for configMapRef")
+				}
+				key, ok := objmap["key"].(string)
+				if !ok {
+					return "", fmt.Errorf("Failed: GetValueFrom is not well-formed, missing key for configMapRef")
+				}
+				namespace, ok := objmap["namespace"].(string)
+				if !ok {
+					namespace = composableNamespace
+				}
+				configMapNamespacedname := types.NamespacedName{Namespace: namespace, Name: name}
+				configMap := &v1.ConfigMap{}
+
+				err := r.Get(context.TODO(), configMapNamespacedname, configMap)
+				if err != nil {
+					return "", err
+				}
+				configMapData := configMap.Data[key]
+				return string(configMapData), nil
+			}
+			return "", fmt.Errorf("Failed: GetValueFrom is not well-formed, configMapRef is not a map")
 		}
 	}
 	return "", fmt.Errorf("Failed: GetValueFrom is not well-formed")
@@ -236,6 +262,9 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 	object, err := toJSONFromRaw(instance.Spec.Template)
 	if err != nil {
 		log.Printf("Failed to read template data: %s\n" + err.Error())
+		instance.Status.State = "Pending"
+		instance.Status.Message = err.Error()
+		r.Update(context.TODO(), instance)
 		return reconcile.Result{}, err
 	}
 
@@ -249,36 +278,32 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 			return reconcile.Result{}, nil
 		}
 		log.Printf("Problem resolving template: %s\n", err.Error())
+		instance.Status.State = "Pending"
+		instance.Status.Message = err.Error()
+		r.Update(context.TODO(), instance)
 		return reconcile.Result{}, err
 	}
 	log.Println(resource)
 
 	name, err := getName(resource.Object)
 	if err != nil {
-		if strings.Contains(err.Error(), "Failed") {
-			log.Printf(err.Error())
-			instance.Status.State = "Failed"
-			instance.Status.Message = err.Error()
-			r.Update(context.TODO(), instance)
-			return reconcile.Result{}, nil
-		}
 		log.Printf(err.Error())
-		return reconcile.Result{}, err
+		instance.Status.State = "Failed"
+		instance.Status.Message = err.Error()
+		r.Update(context.TODO(), instance)
+		return reconcile.Result{}, nil
+
 	}
 
 	log.Println("Resource name is: " + name)
 
 	namespace, err := getNamespace(resource.Object)
 	if err != nil {
-		if strings.Contains(err.Error(), "Failed") {
-			log.Printf(err.Error())
-			instance.Status.State = "Failed"
-			instance.Status.Message = err.Error()
-			r.Update(context.TODO(), instance)
-			return reconcile.Result{}, nil
-		}
 		log.Printf(err.Error())
-		return reconcile.Result{}, err
+		instance.Status.State = "Failed"
+		instance.Status.Message = err.Error()
+		r.Update(context.TODO(), instance)
+		return reconcile.Result{}, nil
 	}
 
 	log.Println("Resource namespace is: " + namespace)
@@ -305,6 +330,9 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 
 	if err := controllerutil.SetControllerReference(instance, &resource, r.scheme); err != nil {
 		log.Println(err.Error())
+		instance.Status.State = "Pending"
+		instance.Status.Message = err.Error()
+		r.Update(context.TODO(), instance)
 		return reconcile.Result{}, err
 	}
 

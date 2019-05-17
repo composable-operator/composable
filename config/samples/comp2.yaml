@@ -1,0 +1,29 @@
+apiVersion: ibmcloud.ibm.com/v1alpha1
+kind: Composable
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: comp
+spec:
+  template: 
+    apiVersion: ibmcloud.ibm.com/v1alpha1
+    kind: Service
+    metadata:
+      name:
+        getValueFrom:
+          configMapRef:
+            name: myconfigmap
+            key: name
+    spec:
+      instancename: 
+        getValueFrom:
+          configMapRef:
+            name: myconfigmap
+            key: name
+      service: Event Streams
+      plan: 
+        getValueFrom:
+          secretKeyRef: 
+            name: mysecret
+            key: plan
+           
