@@ -22,6 +22,7 @@ import (
 	"log"
 	"reflect"
 	"strings"
+	"time"
 
 	ibmcloudv1alpha1 "github.ibm.com/seed/composable/pkg/apis/ibmcloud/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
@@ -108,14 +109,14 @@ func resolve(r *ReconcileComposable, object interface{}, composableNamespace str
 	// Set namespace if undefined
 	objMap := object.(map[string]interface{})
 	if _, ok := objMap["metadata"]; !ok {
-		return unstructured.Unstructured{}, fmt.Errorf("Template has no metadata section")
+		return unstructured.Unstructured{}, fmt.Errorf("Failed: Template has no metadata section")
 	}
 	if metadata, ok := objMap["metadata"].(map[string]interface{}); ok {
 		if _, ok := metadata["namespace"]; !ok {
 			metadata["namespace"] = composableNamespace
 		}
 	} else {
-		return unstructured.Unstructured{}, fmt.Errorf("Template has an ill-defined metadata section")
+		return unstructured.Unstructured{}, fmt.Errorf("Failed: Template has an ill-defined metadata section")
 	}
 
 	obj, err := resolveFields(r, object.(map[string]interface{}), composableNamespace)
@@ -133,7 +134,7 @@ func resolveFields(r *ReconcileComposable, fields map[string]interface{}, compos
 		if values, ok := v.(map[string]interface{}); ok {
 			if value, ok := values[getValueFrom]; ok {
 				if len(values) > 1 {
-					return nil, fmt.Errorf("Template is ill-formed. GetValueFrom must be the only field in a value")
+					return nil, fmt.Errorf("Failed: Template is ill-formed. GetValueFrom must be the only field in a value")
 				}
 				resolvedValue, err := resolveValue(r, value, composableNamespace)
 				if err != nil {
@@ -153,17 +154,16 @@ func resolveFields(r *ReconcileComposable, fields map[string]interface{}, compos
 }
 
 func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace string) (string, error) {
-	log.Println("here")
 	if val, ok := value.(map[string]interface{}); ok {
 		if obj, ok := val["secretKeyRef"]; ok {
 			if objmap, ok := obj.(map[string]interface{}); ok {
 				name, ok := objmap["name"].(string)
 				if !ok {
-					return "", fmt.Errorf("GetValueFrom is not well-formed, missing name for secretKeyRef")
+					return "", fmt.Errorf("Failed: GetValueFrom is not well-formed, missing name for secretKeyRef")
 				}
 				key, ok := objmap["key"].(string)
 				if !ok {
-					return "", fmt.Errorf("GetValueFrom is not well-formed, missing key for secretKeyRef")
+					return "", fmt.Errorf("Failed: GetValueFrom is not well-formed, missing key for secretKeyRef")
 				}
 				namespace, ok := objmap["namespace"].(string)
 				if !ok {
@@ -177,19 +177,16 @@ func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace
 					return "", err
 				}
 				secretData := secret.Data[key]
-				log.Printf("****** plan is: %s", string(secretData))
 				return string(secretData), nil
 
 			}
-			return "", fmt.Errorf("GetValueFrom is not well-formed, secretKeyRef is not a map")
+			return "", fmt.Errorf("Failed: GetValueFrom is not well-formed, secretKeyRef is not a map")
 			// }
 			// else if obj, ok := val["configMapKeyRef"]; ok {
 
-		} else {
-			return "", fmt.Errorf("GetValueFrom is not well-formed")
 		}
 	}
-	return "", fmt.Errorf("GetValueFrom is not well-formed")
+	return "", fmt.Errorf("Failed: GetValueFrom is not well-formed")
 }
 
 func getName(obj map[string]interface{}) (string, error) {
@@ -197,7 +194,7 @@ func getName(obj map[string]interface{}) (string, error) {
 	if name, ok := metadata["name"]; ok {
 		return name.(string), nil
 	}
-	return "", fmt.Errorf("Template does not contain name")
+	return "", fmt.Errorf("Failed: Template does not contain name")
 }
 
 func getNamespace(obj map[string]interface{}) (string, error) {
@@ -205,7 +202,7 @@ func getNamespace(obj map[string]interface{}) (string, error) {
 	if namespace, ok := metadata["namespace"]; ok {
 		return namespace.(string), nil
 	}
-	return "", fmt.Errorf("Template does not contain namespace")
+	return "", fmt.Errorf("Failed: Template does not contain namespace")
 }
 
 // Reconcile reads that state of the cluster for a Composable object and makes changes based on the state read
@@ -229,6 +226,13 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
+	if reflect.DeepEqual(instance.Status, ibmcloudv1alpha1.ComposableStatus{}) {
+		instance.Status = ibmcloudv1alpha1.ComposableStatus{State: "Pending", Message: "Creating resource"}
+		if err := r.Update(context.Background(), instance); err != nil {
+			return reconcile.Result{}, nil
+		}
+	}
+
 	object, err := toJSONFromRaw(instance.Spec.Template)
 	if err != nil {
 		log.Printf("Failed to read template data: %s\n" + err.Error())
@@ -237,13 +241,27 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 
 	resource, err := resolve(r, object, instance.Namespace)
 	if err != nil {
-		log.Printf("Failed to resolve template: %s\n" + err.Error())
+		if strings.Contains(err.Error(), "Failed") {
+			log.Printf(err.Error())
+			instance.Status.State = "Failed"
+			instance.Status.Message = err.Error()
+			r.Update(context.TODO(), instance)
+			return reconcile.Result{}, nil
+		}
+		log.Printf("Problem resolving template: %s\n", err.Error())
 		return reconcile.Result{}, err
 	}
 	log.Println(resource)
 
 	name, err := getName(resource.Object)
 	if err != nil {
+		if strings.Contains(err.Error(), "Failed") {
+			log.Printf(err.Error())
+			instance.Status.State = "Failed"
+			instance.Status.Message = err.Error()
+			r.Update(context.TODO(), instance)
+			return reconcile.Result{}, nil
+		}
 		log.Printf(err.Error())
 		return reconcile.Result{}, err
 	}
@@ -252,11 +270,38 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 
 	namespace, err := getNamespace(resource.Object)
 	if err != nil {
+		if strings.Contains(err.Error(), "Failed") {
+			log.Printf(err.Error())
+			instance.Status.State = "Failed"
+			instance.Status.Message = err.Error()
+			r.Update(context.TODO(), instance)
+			return reconcile.Result{}, nil
+		}
 		log.Printf(err.Error())
 		return reconcile.Result{}, err
 	}
 
 	log.Println("Resource namespace is: " + namespace)
+
+	apiversion, ok := resource.Object["apiVersion"].(string)
+	if !ok {
+		instance.Status.State = "Failed"
+		instance.Status.Message = "The template has no apiVersion"
+		r.Update(context.TODO(), instance)
+		return reconcile.Result{}, nil
+	}
+
+	log.Println("Resource apiversion is: " + apiversion)
+
+	kind, ok := resource.Object["kind"].(string)
+	if !ok {
+		instance.Status.State = "Failed"
+		instance.Status.Message = "The template has no kind"
+		r.Update(context.TODO(), instance)
+		return reconcile.Result{}, nil
+	}
+
+	log.Println("Resource kind is: " + kind)
 
 	if err := controllerutil.SetControllerReference(instance, &resource, r.scheme); err != nil {
 		log.Println(err.Error())
@@ -264,27 +309,45 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 
 	found := &unstructured.Unstructured{}
+	found.SetAPIVersion(apiversion)
+	found.SetKind(kind)
+
 	err = r.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, found)
-	if err != nil && strings.Contains(err.Error(), "no matches") {
+	if err != nil && strings.Contains(err.Error(), "not found") {
+		log.Println(err.Error())
 		log.Printf("Creating resource %s/%s\n", namespace, name)
 		err = r.Create(context.TODO(), &resource)
 		if err != nil {
-			return reconcile.Result{}, err
+			log.Printf(err.Error())
+			instance.Status.State = "Failed"
+			instance.Status.Message = err.Error()
+			r.Update(context.TODO(), instance)
+			return reconcile.Result{}, nil
 		}
 	} else if err != nil {
-		log.Println("*****" + err.Error())
-		return reconcile.Result{}, err
+		log.Printf(err.Error())
+		instance.Status.State = "Failed"
+		instance.Status.Message = err.Error()
+		r.Update(context.TODO(), instance)
+		return reconcile.Result{}, nil
 	}
 
 	// Update the found object and write the result back if there are any changes
 	if !reflect.DeepEqual(resource.Object["Spec"], found.Object["Spec"]) {
 		found.Object["Spec"] = resource.Object["Spec"]
-		log.Printf("Updating Deployment %s/%s\n", namespace, name)
+		log.Printf("Updating Resource %s/%s\n", namespace, name)
 		err = r.Update(context.TODO(), found)
 		if err != nil {
-			log.Println(err.Error())
-			return reconcile.Result{}, err
+			log.Printf(err.Error())
+			instance.Status.State = "Failed"
+			instance.Status.Message = err.Error()
+			r.Update(context.TODO(), instance)
+			return reconcile.Result{}, nil
 		}
 	}
+
+	instance.Status.State = "Online"
+	instance.Status.Message = time.Now().Format(time.RFC850)
+	r.Update(context.TODO(), instance)
 	return reconcile.Result{}, nil
 }
