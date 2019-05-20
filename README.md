@@ -59,4 +59,16 @@ spec:
  ```
  
  In the above example, the name of the underlying `Service.ibmcloud` instance is obtained from a `configmap` and the same name is used for the field `instancename`. This allows flexibility in defining configurations, and promotes the reuse of yamls by alleviating hard-wired information. Moreover, it can be used to configure with data that is computed dynamically as a result of the deployment of some other resource.
+ 
+ 
+## Namespaces
+
+The `getValueFrom` section can have a field for the `namespace`. In this case, the specified namespace is used to look up the object that is being referenced. If the `namespace` field is absent then the namespace of the Composable object itself is used instead.
+
+The template object can have a `namespace` specified in its `metadata` section. In that case, the underlying object is created in that namespace. If the template does not have a `namespace` field, then the object is created in the namespace of the `Composable` itself.
+
+## Deletion
+
+When the Composable object is deleted, the underlying object is deleted as well.
+However, currently if the user deletes the underlying object manually, it is not automatically recreated (future work).
            
