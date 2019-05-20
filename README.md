@@ -5,7 +5,6 @@ Composable is an overlay operator that can wrap any resource (native Kubernetes 
 The Composable Operator enables the complete declarative executable specification of collections of inter-dependent resources.
 
 Example:
-
 ```
 apiVersion: ibmcloud.ibm.com/v1alpha1
 kind: Composable
