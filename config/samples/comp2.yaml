@@ -20,7 +20,7 @@ spec:
           configMapRef:
             name: myconfigmap
             key: name
-      service: Event Streams
+      serviceClass: Event Streams
       plan: 
         getValueFrom:
           secretKeyRef: 
