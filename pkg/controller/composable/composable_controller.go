@@ -67,6 +67,8 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	r.(*ReconcileComposable).controller = c
+
 	// Watch for changes to Composable
 	err = c.Watch(&source.Kind{Type: &ibmcloudv1alpha1.Composable{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
@@ -92,7 +94,8 @@ var _ reconcile.Reconciler = &ReconcileComposable{}
 // ReconcileComposable reconciles a Composable object
 type ReconcileComposable struct {
 	client.Client
-	scheme *runtime.Scheme
+	scheme     *runtime.Scheme
+	controller controller.Controller
 }
 
 func toJSONFromRaw(content *runtime.RawExtension) (interface{}, error) {
@@ -345,6 +348,21 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 		log.Println(err.Error())
 		log.Printf("Creating resource %s/%s\n", namespace, name)
 		err = r.Create(context.TODO(), &resource)
+		if err != nil {
+			log.Printf(err.Error())
+			if instance.Status.State != "Failed" {
+				instance.Status.State = "Failed"
+				instance.Status.Message = err.Error()
+				r.Update(context.TODO(), instance)
+			}
+			return reconcile.Result{}, nil
+		}
+
+		// add watcher
+		err = r.controller.Watch(&source.Kind{Type: found}, &handler.EnqueueRequestForOwner{
+			IsController: true,
+			OwnerType:    &ibmcloudv1alpha1.Composable{},
+		})
 		if err != nil {
 			log.Printf(err.Error())
 			instance.Status.State = "Failed"

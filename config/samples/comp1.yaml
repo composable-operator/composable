@@ -12,7 +12,7 @@ spec:
       name: mymessagehub
     spec:
       instancename: mymessagehub
-      service: Event Streams
+      serviceClass: Event Streams
       plan: 
         getValueFrom:
           secretKeyRef: 
