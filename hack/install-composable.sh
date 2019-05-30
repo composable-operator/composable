@@ -17,5 +17,7 @@
 
 VERSION="v0.1.0"
 SCRIPTS_HOME=$(dirname ${BASH_SOURCE})
+NAMESPACE=${1:-"default"}
 
-kubectl apply -f ${SCRIPTS_HOME}/../releases/${VERSION}
+kubectl get ns $NAMESPACE > /dev/null || kubectl create ns ${NAMESPACE}
+kubectl apply -f ${SCRIPTS_HOME}/../releases/${VERSION} -n ${NAMESPACE}
