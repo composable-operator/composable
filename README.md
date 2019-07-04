@@ -31,9 +31,9 @@ spec:
       service: Event Streams
       plan: 
         getValueFrom:
-          secretKeyRef: 
-            name: mysecret
-            key: plan
+          kind: Secret 
+          name: mysecret
+          path: data.plan
 ```
 
 In this example, the field `plan` of the `Service.ibmcloud` instance is specified by referring to a secret. When the composable operator is created, its controller tries to read the secret and obtains the data needed for this field. If the secret is available, it then creates the `Service.ibmcloud` resource with the proper configuration. If the secret does not exist, the Composable controller keeps re-trying until it becomes available.
@@ -51,24 +51,31 @@ spec:
     metadata:
       name:
         getValueFrom:
-          configMapRef:
-            name: myconfigmap
-            key: name
+          kind: ConfigMap
+          name: myconfigmap
+          path: data.name
     spec:
       instancename: 
         getValueFrom:
-          configMapRef:
-            name: myconfigmap
-            key: name
+          kind: ConfigMap
+          name: myconfigmap
+          path: data.name
       service: Event Streams
       plan: 
         getValueFrom:
-          secretKeyRef: 
-            name: mysecret
-            key: plan
+          kind: Secret 
+          name: mysecret
+          path: data.plan
  ```
  
- In the above example, the name of the underlying `Service.ibmcloud` instance is obtained from a `configmap` and the same name is used for the field `instancename`. This allows flexibility in defining configurations, and promotes the reuse of yamls by alleviating hard-wired information. Moreover, it can be used to configure with data that is computed dynamically as a result of the deployment of some other resource.
+ In the above example, the name of the underlying `Service.ibmcloud` instance is obtained from a `configmap` and the same 
+ name is used for the field `instancename`. This allows flexibility in defining configurations, and promotes the reuse 
+ of yamls by alleviating hard-wired information.
+ Moreover, it can be used to configure with data that is computed dynamically as a result of the deployment of some other 
+ resource.
+ The `getValueFrom` element can point to any K8s and its extensions object. The kind of teh object is defined by the`kind` 
+ element; the object name is defined by teh `name` elements, and finally, the path to the data is defined by the value of
+ the `path` element, which is a string with dots as a delimiter. 
  
  
 ## Namespaces

@@ -16,23 +16,55 @@ limitations under the License.
 package main
 
 import (
+	"flag"
 	"log"
+	"os"
 
 	"github.ibm.com/seed/composable/pkg/apis"
 	"github.ibm.com/seed/composable/pkg/controller"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 )
 
+func BuildConfig(kubeconfig *string) (*rest.Config, error) {
+	var config *rest.Config
+	var err error
+	if *kubeconfig != "" { // off-cluster
+		config, err = clientcmd.BuildConfigFromFlags("", *kubeconfig)
+		if err != nil {
+			return nil, err
+		}
+	} else { // in-cluster
+		config, err = rest.InClusterConfig()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return config, nil
+}
+
 func main() {
-	// Get a config to talk to the apiserver
-	cfg, err := config.GetConfig()
+
+	kubeconfig := flag.String("kubeconfig", "", "Path to a kube config. Only required if out-of-cluster.")
+	if flag.Lookup("kubeconfig") == nil {
+		flag.String("kubeconfig", os.Getenv("KUBECONFIG"), "Path to a kube config. Only required if out-of-cluster.")
+	}
+	flag.Parse()
+	// build config for the  cluster
+	cfg, err := BuildConfig(kubeconfig)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	// Get a config to talk to the apiserver
+	//cfg, err := config.GetConfig()
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
 
 	// Create a new Cmd to provide shared dependencies and start components
 	mgr, err := manager.New(cfg, manager.Options{})

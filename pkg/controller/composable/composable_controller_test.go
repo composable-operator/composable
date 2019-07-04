@@ -48,9 +48,12 @@ func TestReconcile(t *testing.T) {
 	g.Expect(err).NotTo(gomega.HaveOccurred())
 	c = mgr.GetClient()
 
-	recFn, requests := SetupTestReconcile(newReconciler(mgr))
+	r, err := newReconciler(mgr)
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+	recFn, requests := SetupTestReconcile(r)
 	g.Expect(add(mgr, recFn)).NotTo(gomega.HaveOccurred())
 	defer close(StartTestManager(mgr, g))
+
 
 	// Create the Composable object and expect the Reconcile and Deployment to be created
 	err = c.Create(context.TODO(), instance)
