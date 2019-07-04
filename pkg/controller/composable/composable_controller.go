@@ -58,33 +58,41 @@ type ReconcileComposable struct {
 	controller controller.Controller
 }
 
-var _ reconcile.Reconciler = &ReconcileComposable{}
+type reconcilerWithController interface {
+	reconcile.Reconciler
+	GetController() controller.Controller
+}
+
+var _ reconcilerWithController = &ReconcileComposable{}
 
 // Add creates a new Composable Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 // USER ACTION REQUIRED: update cmd/manager/main.go to call this ibmcloud.Add(mgr) to install this Controller
 func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
-}
-
-// newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	fmt.Println("newReconciler")
-	return &ReconcileComposable{Client: mgr.GetClient(), scheme: mgr.GetScheme(), config: mgr.GetConfig()}
-}
-
-// add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
-	// Create a new controller
-	c, err := controller.New("composable-controller", mgr, controller.Options{Reconciler: r})
+	r, err := newReconciler(mgr)
 	if err != nil {
 		return err
 	}
+	return add(mgr, r)
+}
 
-	r.(*ReconcileComposable).controller = c
+// newReconciler returns a new reconcile.Reconciler
+func newReconciler(mgr manager.Manager) (reconcilerWithController, error) {
+	r := &ReconcileComposable{Client: mgr.GetClient(), scheme: mgr.GetScheme(), config: mgr.GetConfig()}
+	c, err := controller.New("composable-controller", mgr, controller.Options{Reconciler: r})
+	if err != nil {
+		return nil, err
+	}
+	r.controller = c
+	return r, nil
+}
 
+// add adds a new Controller to mgr with r as the reconcile.Reconciler
+func add(mgr manager.Manager, r reconcilerWithController) error {
+
+	c := r.GetController()
 	// Watch for changes to Composable
-	err = c.Watch(&source.Kind{Type: &ibmcloudv1alpha1.Composable{}}, &handler.EnqueueRequestForObject{})
+	err := c.Watch(&source.Kind{Type: &ibmcloudv1alpha1.Composable{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -131,32 +139,56 @@ func resolve(r *ReconcileComposable, object interface{}, composableNamespace str
 	if err != nil {
 		return unstructured.Unstructured{}, err
 	}
-	ret := unstructured.Unstructured{
-		Object: obj,
-	}
+	ret := unstructured.Unstructured{ Object: obj.(map[string]interface{}) }
+	fmt.Printf("OBJ = %+v\n", obj)
 	return ret, nil
 }
 
-func resolveFields(r *ReconcileComposable, fields map[string]interface{}, composableNamespace string, resources *[]*metav1.APIResourceList) (map[string]interface{}, error) {
-	for k, v := range fields {
-		if values, ok := v.(map[string]interface{}); ok {
-			if value, ok := values[getValueFrom]; ok {
-				if len(values) > 1 {
-					return nil, fmt.Errorf("Failed: Template is ill-formed. GetValueFrom must be the only field in a value")
+func resolveFields(r *ReconcileComposable, fields interface{}, composableNamespace string, resources *[]*metav1.APIResourceList)  (interface{}, error) {
+
+	switch fields.(type) {
+	case map[string]interface{}:
+		if fieldsOut, ok := fields.(map[string]interface{}); ok {
+			for k, v := range fieldsOut {
+				if values, ok := v.(map[string]interface{}); ok {
+					var newFields interface{}
+					var err error
+					if value, ok := values[getValueFrom]; ok {
+						if len(values) > 1 {
+							return nil, fmt.Errorf("Failed: Template is ill-formed. GetValueFrom must be the only field in a value")
+						}
+						newFields, err = resolveValue(r, value, composableNamespace, resources)
+					} else {
+						newFields, err = resolveFields(r, values, composableNamespace, resources)
+					}
+					if err != nil {
+						return nil, err
+					}
+					fieldsOut[k] = newFields
+				} else if values, ok := v.([]interface{}); ok {
+					for i, value := range values {
+						newFields, err := resolveFields(r, value, composableNamespace, resources)
+						if err != nil {
+							return nil, err
+						}
+						values[i] = newFields
+					}
 				}
-				resolvedValue, err := resolveValue(r, value, composableNamespace, resources)
-				if err != nil {
-					return nil, err
-				}
-				fields[k] = resolvedValue
-			} else {
-				newFields, err := resolveFields(r, values, composableNamespace, resources)
-				if err != nil {
-					return nil, err
-				}
-				fields[k] = newFields
 			}
 		}
+
+	case []map[string]interface{}, [][]interface{}:
+		if values, ok := fields.([]interface{}); ok {
+			for i, value := range values {
+				newFields, err := resolveFields(r, value, composableNamespace, resources)
+				if err != nil {
+					return nil, err
+				}
+				values[i] = newFields
+			}
+		}
+	default:
+		return fields, nil
 	}
 	return fields, nil
 }
@@ -255,6 +287,7 @@ func LookupAPIResource(r *ReconcileComposable /*config *rest.Config */, key, tar
 
 func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace string, resources *[]*metav1.APIResourceList) (string, error) {
 
+	fmt.Printf("resolveValue %#v\n", value)
 	if val, ok := value.(map[string]interface{}); ok {
 		if kind, ok := val["kind"].(string); ok {
 			res, err := LookupAPIResource(r, kind, "", resources)
@@ -323,6 +356,10 @@ func getNamespace(obj map[string]interface{}) (string, error) {
 		return namespace.(string), nil
 	}
 	return "", fmt.Errorf("Failed: Template does not contain namespace")
+}
+
+func (r *ReconcileComposable) GetController() controller.Controller {
+	return r.controller
 }
 
 // Reconcile reads that state of the cluster for a Composable object and makes changes based on the state read

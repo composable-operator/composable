@@ -30,6 +30,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+type TestReconcileComposable struct {
+	ReconcileComposable
+	requests chan reconcile.Request
+}
+
 var cfg *rest.Config
 
 func TestMain(m *testing.M) {
@@ -48,16 +53,18 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+func (r *TestReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	result, err := r.ReconcileComposable.Reconcile(request)
+	r.requests <- request
+	return result, err
+}
+
 // SetupTestReconcile returns a reconcile.Reconcile implementation that delegates to inner and
 // writes the request to requests after Reconcile is finished.
-func SetupTestReconcile(inner reconcile.Reconciler) (reconcile.Reconciler, chan reconcile.Request) {
+func SetupTestReconcile(inner reconcilerWithController) (reconcilerWithController, chan reconcile.Request) {
 	requests := make(chan reconcile.Request)
-	fn := reconcile.Func(func(req reconcile.Request) (reconcile.Result, error) {
-		result, err := inner.Reconcile(req)
-		requests <- req
-		return result, err
-	})
-	return fn, requests
+	testReconcile := TestReconcileComposable{ReconcileComposable: *(inner.(*ReconcileComposable)), requests: requests}
+	return &testReconcile, requests
 }
 
 // StartTestManager adds recFn
