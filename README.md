@@ -94,8 +94,8 @@ spec:
  of yamls by alleviating hard-wired information.
  Moreover, it can be used to configure with data that is computed dynamically as a result of the deployment of some other 
  resource.
- The `getValueFrom` element can point to any K8s and its extensions object. The kind of teh object is defined by the`kind` 
- element; the object name is defined by teh `name` elements, and finally, the path to the data is defined by the value of
+ The `getValueFrom` element can point to any K8s and its extensions object. The kind of the object is defined by the`kind` 
+ element; the object name is defined by the `name` elements, and finally, the path to the data is defined by the value of
  the `path` element, which is a string with dots as a delimiter. 
  
  
