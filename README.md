@@ -40,12 +40,12 @@ spec:
           # The jsonpath style path to the field
           # Example: get value of nodePort from a service ports array, when the port name is "grps"
           # path: {.spec.ports[?(@.name=="grpc")].nodePort}
-          path: data.plan
+          path: {.data.plan}
           
           # [Optional] the discovered object's namespace, if doesn't present, the Compodable object namespace will be used
           # namespace: my-namespace
           
-          # [Optional] format-transformer, array of the available values, which are:
+          # [Optional] format-transformers, array of the available values, which are:
           # int2string 		- transforms integer to string
           # string2int 		- transforms string to integer
           # base642string  	- decodes a base64 encoded string to a plain one
