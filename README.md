@@ -31,9 +31,30 @@ spec:
       service: Event Streams
       plan: 
         getValueFrom:
+          # any Kubernetes or CRD Kind
           kind: Secret 
+          
+          # The discovered object name
           name: mysecret
-          path: data.plan
+          
+          # The jsonpath style path to the field
+          # Example: get value of nodePort from a service ports array, when the port name is "grps"
+          # path: {.spec.ports[?(@.name=="grpc")].nodePort}
+          path: {.data.plan}
+          
+          # [Optional] the discovered object's namespace, if doesn't present, the Compodable object namespace will be used
+          # namespace: my-namespace
+          
+          # [Optional] format-transformers, array of the available values, which are:
+          # int2string 		- transforms integer to string
+          # string2int 		- transforms string to integer
+          # base642string  	- decodes a base64 encoded string to a plain one
+          # string2base64	- encodes a plain string to a base 64 encoded string
+          # if presents, the operator will transform discovered data to the wished format
+          # Example: transform data from base64 encoded string to an integer
+          # format-transformer:
+          #  - base642string
+          #  - string2int
 ```
 
 In this example, the field `plan` of the `Service.ibmcloud` instance is specified by referring to a secret. When the composable operator is created, its controller tries to read the secret and obtains the data needed for this field. If the secret is available, it then creates the `Service.ibmcloud` resource with the proper configuration. If the secret does not exist, the Composable controller keeps re-trying until it becomes available.
@@ -73,8 +94,8 @@ spec:
  of yamls by alleviating hard-wired information.
  Moreover, it can be used to configure with data that is computed dynamically as a result of the deployment of some other 
  resource.
- The `getValueFrom` element can point to any K8s and its extensions object. The kind of teh object is defined by the`kind` 
- element; the object name is defined by teh `name` elements, and finally, the path to the data is defined by the value of
+ The `getValueFrom` element can point to any K8s and its extensions object. The kind of the object is defined by the`kind` 
+ element; the object name is defined by the `name` elements, and finally, the path to the data is defined by the value of
  the `path` element, which is a string with dots as a delimiter. 
  
  

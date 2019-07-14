@@ -16,6 +16,7 @@ limitations under the License.
 package composable
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -34,6 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/third_party/forked/golang/template"
+	"k8s.io/client-go/util/jsonpath"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -285,9 +288,8 @@ func LookupAPIResource(r *ReconcileComposable /*config *rest.Config */, key, tar
 	return nil, fmt.Errorf("Unable to find api resource named %q.", key)
 }
 
-func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace string, resources *[]*metav1.APIResourceList) (string, error) {
+func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace string, resources *[]*metav1.APIResourceList) (interface{}, error) {
 
-	fmt.Printf("resolveValue %#v\n", value)
 	if val, ok := value.(map[string]interface{}); ok {
 		if kind, ok := val["kind"].(string); ok {
 			res, err := LookupAPIResource(r, kind, "", resources)
@@ -317,19 +319,66 @@ func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace
 						fmt.Printf("Error: %v\n", err)
 						return "", err
 					}
+					fmt.Println("11")
+
+					// TODO add jsonpath
+					j := jsonpath.New("compose")
+					//path = "{.Object.spec.portName}"
+					err = j.Parse(path)
+
+					if err != nil {
+						log.Fatalf("jsonpath 1.5 %v", err)
+						return nil, err
+					}
+					j.AllowMissingKeys(false)
+					//buf := new(bytes.Buffer)
+					//err = j.Execute(buf, unstrObj)
+					fullResults, err := j.FindResults(unstrObj)
+					if err != nil {
+						log.Fatalf("jsonpath 2 %v", err)
+						return nil, err
+					}
+					if len(fullResults) > 1 || len(fullResults[0]) > 1{
+						return nil, fmt.Errorf("Failed: Template is ill-formed, it points to multipale values" )
+					}
+					iface, ok := template.PrintableValue(fullResults[0][0])
+					if !ok {
+						return nil, fmt.Errorf("can't print type %s", fullResults[0][0])
+					}
+					var buffer bytes.Buffer
+					fmt.Fprint(&buffer, iface)
+					fmt.Printf("RESULTS %+v\n", buffer.String())
+
+					/*
 					subPath := strings.Split(path, ".")
 					obj := unstrObj.Object
-					var val interface{}
-					val = obj
+					var retVal interface{}
+					retVal = obj
 					for _, p := range subPath {
-						obj = val.(map[string]interface{})
-						val, ok = obj[p]
+						obj = retVal.(map[string]interface{})
+						retVal, ok = obj[p]
 						if !ok {
 							fmt.Printf("Wrong path, object %v, doesn't have path %s\n", obj, p)
 						}
 					}
-					fmt.Printf("RETURN %s\n", val.(string))
-					return val.(string), nil
+					fmt.Printf("GOT %v [%T]\n", val, val)
+					*/
+					var retVal interface{}
+					fmt.Printf("val = %v\n", val)
+					fmt.Printf("tr = %v [%T]\n", val["format-transformers"], val["format-transformers"])
+					if transformers, ok := val["format-transformers"].([]interface{}); ok && len (transformers) > 0 {
+						transformNames := make([]string, 0, len(transformers))
+						for _, v := range transformers {
+							if name, ok := v.(string); ok {
+								transformNames = append(transformNames,name)
+							}
+						}
+						retVal, err =  CompoundTransformerNames(buffer.String(), transformNames...)
+					} else {
+						retVal = buffer.String()
+					}
+					fmt.Printf("resolveValue returned %v [%T]\n", retVal, retVal)
+					return retVal, nil
 
 				}
 				return "", fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is nor defined")
@@ -459,6 +508,7 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 			if instance.Status.State != FailedStatus {
 				r.errorHandler(instance, err, FailedStatus, "Failed", "")
 			}
+			fmt.Println("Return 1")
 			return reconcile.Result{}, nil
 		}
 
@@ -469,10 +519,13 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 		})
 		if err != nil {
 			r.errorHandler(instance, err, FailedStatus, "", "")
+			fmt.Println("Return 2")
 			return reconcile.Result{}, nil
 		}
 	} else if err != nil {
+		fmt.Printf("ERROR %v\n", err)
 		r.errorHandler(instance, err, FailedStatus, "", "")
+		fmt.Println("Return 3")
 		return reconcile.Result{}, nil
 	}
 
@@ -483,13 +536,20 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 		err = r.Update(context.TODO(), found)
 		if err != nil {
 			r.errorHandler(instance, err, FailedStatus, "", "")
+			fmt.Println("Return 4")
 			return reconcile.Result{}, nil
 		}
 	}
 
 	instance.Status.State = OnlineStatus
 	instance.Status.Message = time.Now().Format(time.RFC850)
-	r.Update(context.TODO(), instance)
+	err = r.Update(context.TODO(), instance)
+	if err != nil {
+		r.errorHandler(instance, err, FailedStatus, "", "")
+		fmt.Println("Return 4.5")
+		return reconcile.Result{}, err
+	}
+	fmt.Println("Return 5")
 	return reconcile.Result{}, nil
 }
 
