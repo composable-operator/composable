@@ -1,3 +1,18 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [Composable Operator](#composable-operator)
+  - [Installation](#installation)
+  - [Examples](#examples)
+  - [Namespaces](#namespaces)
+  - [Deletion](#deletion)
+  - [Limitations](#limitations)
+  - [TODO](#todo)
+  - [Questions](#questions)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Composable Operator
 
 Composable is an overlay operator that can wrap any resource (native Kubernetes or CRD instance) and allows it to be dynamically configurable. Any field of the underlying resource can be specified with a reference to a secret or a configmap.
@@ -39,7 +54,7 @@ spec:
           
           # The jsonpath style path to the field
           # Example: get value of nodePort from a service ports array, when the port name is "http"
-          path: {.Object.spec.ports[?(@.name==“http”)].port}}
+          path: {.spec.ports[?(@.name==“http”)].port}}
           
           # [Optional] the discovered object's namespace, if doesn't present, the Composable object namespace will be used
           # namespace: my-namespace
@@ -75,19 +90,19 @@ spec:
         getValueFrom:
           kind: ConfigMap
           name: myconfigmap
-          path: {.Object.data.name}
+          path: {.data.name}
     spec:
       instancename: 
         getValueFrom:
           kind: ConfigMap
           name: myconfigmap
-          path: {.Object.data.name}
+          path: {.data.name}
       service: Event Streams
       plan: 
         getValueFrom:
           kind: Secret 
           name: mysecret
-          path: {.Object.data.plan}
+          path: {.data.plan}
  ```
  
  In the above example, the name of the underlying `Service.ibmcloud` instance is obtained from a `configmap` and the same 
