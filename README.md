@@ -128,12 +128,13 @@ For `jsonpath` parsing we use a sub-package from `go-client`. Due to
 * Support waiting conditions - wait when a checking resource is Online, Ready, or Running, and after that do other 
 operations: deploy, retrieve value and deploy, start a job ...
 * Support resource monitoring, and automatically propagate the updates.
+* Replace logger
 
 ## Questions
 
 * Should we provide a separate discovery mechanism to retrieve values from Secrets and ConfigMap.
 	* The path can be changed from `{.Object.data.key}` to `data.key` or even just `key`. 
-	* In any case, we probably have to support transformers.  
+	* In any case, we probably have to support transformers.`  
 * Should we eliminate the prefix `Object` in the jsonpath? 
 
            
