@@ -6,8 +6,10 @@
   - [Installation](#installation)
   - [Examples](#examples)
   - [Namespaces](#namespaces)
+  - [Field path discovery](#field-path-discovery)
+    - [Limitations](#limitations)
+  - [Data formatting roles](#data-formatting-roles)
   - [Deletion](#deletion)
-  - [Limitations](#limitations)
   - [TODO](#todo)
   - [Questions](#questions)
 
@@ -60,12 +62,12 @@ spec:
           # namespace: my-namespace
           
           # [Optional] format-transformers, array of the available values, which are:
-          # int2String 		- transforms integer to string
-          # string2Int 		- transforms string to integer
-          # base642String  	- decodes a base64 encoded string to a plain one
-          # string2Base64	- encodes a plain string to a base 64 encoded string
-          # string2Float    - transforms string to float
-          # float2String    - transforms float to string
+          # ToString 		- transforms interface to string
+          # String2Int 		- transforms string to integer
+          # Base642String  	- decodes a base64 encoded string to a plain one
+          # String2Base64	- encodes a plain string to a base 64 encoded string
+          # String2Float    - transforms string to float
+          # Array2CSString  - transforms arrays of objects to a comma-separated string
           # if presents, the operator will transform discovered data to the wished format
           # Example: transform data from base64 encoded string to an integer
           # format-transformer:
@@ -125,20 +127,48 @@ The template object can have a `namespace` specified in its `metadata` section. 
 created in that namespace. If the template does not have a `namespace` field, then the object is created in 
 the namespace of the `Composable` itself.
 
+## Field path discovery
+
+We use a `jsonpath` parser from `go-client` to define path to the resolving files. Here some examples:
+
+* `{.data.key-name}` - returns a path to the key named `key-name` from a `ConfigMap` or from a `Secret`
+* `{.spec.ports[?(@.name==“http”)].port}}` - takes port value from a port named `http` from the `ports` array
+
+### Limitations
+
+Due to 
+[issue #72220](https://github.com/kubernetes/kubernetes/issues/72220), `jsonpath` doesn't support regular expressions 
+in json-path
+
+## Data formatting roles
+
+Frequently data retrieved from another object needs to be transformed to another format. `format-transformers` help to 
+do it. Here are the data transformation roles:
+ 
+* If there is no data transformers  -  original data format will be used, include complex structures such as maps or arrays.
+* Transformers from the data-transformers array executed one after another according to their order. Which allows 
+creation of data transformation pipelines. For example, teh following snippet defines a data transformation from a base64 
+encoded string to a plain string and after that to integer. This transformation can be useful to retrieve data from Secretes.
+ 
+```yaml
+format-transformers:
+ - Base642String
+ - String2Int
+```  
+
+* `ToString` - returns a native string representation of any object
+* `Array2CSString` - returns a comma-separated string from array's values 
+
 ## Deletion
 
 When the Composable object is deleted, the underlying object is deleted as well.
 However, currently if the user deletes the underlying object manually, it is not automatically recreated (future work).
 
-## Limitations
 
-For `jsonpath` parsing we use a sub-package from `go-client`. Due to 
-[issue #72220](https://github.com/kubernetes/kubernetes/issues/72220), it doesn't support regular expressions in json-path
 
 ## TODO
 
 * Extend e2e test framework
-* Add "JSON array" to comma-separated string transformer
 * Allow transformers as a function, extendability
 * Support waiting conditions - wait when a checking resource is Online, Ready, or Running, and after that do other 
 operations: deploy, retrieve value and deploy, start a job ...

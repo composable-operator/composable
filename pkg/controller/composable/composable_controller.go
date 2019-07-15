@@ -16,7 +16,6 @@ limitations under the License.
 package composable
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -143,7 +142,6 @@ func resolve(r *ReconcileComposable, object interface{}, composableNamespace str
 		return unstructured.Unstructured{}, err
 	}
 	ret := unstructured.Unstructured{ Object: obj.(map[string]interface{}) }
-	fmt.Printf("OBJ = %+v\n", obj)
 	return ret, nil
 }
 
@@ -153,9 +151,15 @@ func resolveFields(r *ReconcileComposable, fields interface{}, composableNamespa
 	case map[string]interface{}:
 		if fieldsOut, ok := fields.(map[string]interface{}); ok {
 			for k, v := range fieldsOut {
-				if values, ok := v.(map[string]interface{}); ok {
-					var newFields interface{}
-					var err error
+				var newFields interface{}
+				var err error
+				if k == getValueFrom {
+					newFields, err = resolveValue(r, v, composableNamespace, resources)
+					if err != nil {
+						return nil, err
+					}
+					fields = newFields
+				}  else if values, ok := v.(map[string]interface{}); ok {
 					if value, ok := values[getValueFrom]; ok {
 						if len(values) > 1 {
 							return nil, fmt.Errorf("Failed: Template is ill-formed. GetValueFrom must be the only field in a value")
@@ -299,91 +303,80 @@ func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace
 			}
 			if name, ok := val["name"].(string); ok {
 				if path, ok := val["path"].(string); ok {
-					var objNamespacedname types.NamespacedName
-					if res.Namespaced {
-						namespace, ok := val["namespace"].(string)
-						if !ok {
-							namespace = composableNamespace
-						}
-						objNamespacedname = types.NamespacedName{Namespace: namespace, Name: name}
-					} else {
-						objNamespacedname = types.NamespacedName{Name: name}
-					}
-
-					groupVersionKind := schema.GroupVersionKind{Kind: res.Kind, Version: res.Version, Group: res.Group}
-					unstrObj := unstructured.Unstructured{}
-					unstrObj.SetAPIVersion(res.Version)
-					unstrObj.SetGroupVersionKind(groupVersionKind)
-					err = r.Get(context.TODO(), objNamespacedname, &unstrObj)
-					if err != nil {
-						fmt.Printf("Error: %v\n", err)
-						return "", err
-					}
-					fmt.Println("11")
-
-					// TODO add jsonpath
-					j := jsonpath.New("compose")
-					//path = "{.Object.spec.portName}"
-					err = j.Parse(path)
-
-					if err != nil {
-						log.Fatalf("jsonpath 1.5 %v", err)
-						return nil, err
-					}
-					j.AllowMissingKeys(false)
-					//buf := new(bytes.Buffer)
-					//err = j.Execute(buf, unstrObj)
-					fullResults, err := j.FindResults(unstrObj)
-					if err != nil {
-						log.Fatalf("jsonpath 2 %v", err)
-						return nil, err
-					}
-					if len(fullResults) > 1 || len(fullResults[0]) > 1{
-						return nil, fmt.Errorf("Failed: Template is ill-formed, it points to multipale values" )
-					}
-					iface, ok := template.PrintableValue(fullResults[0][0])
-					if !ok {
-						return nil, fmt.Errorf("can't print type %s", fullResults[0][0])
-					}
-					var buffer bytes.Buffer
-					fmt.Fprint(&buffer, iface)
-					fmt.Printf("RESULTS %+v\n", buffer.String())
-
-					/*
-					subPath := strings.Split(path, ".")
-					obj := unstrObj.Object
-					var retVal interface{}
-					retVal = obj
-					for _, p := range subPath {
-						obj = retVal.(map[string]interface{})
-						retVal, ok = obj[p]
-						if !ok {
-							fmt.Printf("Wrong path, object %v, doesn't have path %s\n", obj, p)
-						}
-					}
-					fmt.Printf("GOT %v [%T]\n", val, val)
-					*/
-					var retVal interface{}
-					fmt.Printf("val = %v\n", val)
-					fmt.Printf("tr = %v [%T]\n", val["format-transformers"], val["format-transformers"])
-					if transformers, ok := val["format-transformers"].([]interface{}); ok && len (transformers) > 0 {
-						transformNames := make([]string, 0, len(transformers))
-						for _, v := range transformers {
-							if name, ok := v.(string); ok {
-								transformNames = append(transformNames,name)
+					if ! strings.HasPrefix("path", "{.") {
+						var objNamespacedname types.NamespacedName
+						if res.Namespaced {
+							namespace, ok := val["namespace"].(string)
+							if !ok {
+								namespace = composableNamespace
 							}
+							objNamespacedname = types.NamespacedName{Namespace: namespace, Name: name}
+						} else {
+							objNamespacedname = types.NamespacedName{Name: name}
 						}
-						retVal, err =  CompoundTransformerNames(buffer.String(), transformNames...)
-					} else {
-						retVal = buffer.String()
+
+						groupVersionKind := schema.GroupVersionKind{Kind: res.Kind, Version: res.Version, Group: res.Group}
+						unstrObj := unstructured.Unstructured{}
+						unstrObj.SetAPIVersion(res.Version)
+						unstrObj.SetGroupVersionKind(groupVersionKind)
+						err = r.Get(context.TODO(), objNamespacedname, &unstrObj)
+						if err != nil {
+							fmt.Printf("Error: %v\n", err)
+							return nil, err
+						}
+						j := jsonpath.New("compose")
+						// add ".Object" to the path
+						path = path[:1] + ".Object" + path[1:]
+						err = j.Parse(path)
+
+						if err != nil {
+							log.Fatalf("jsonpath 1.5 %v", err)
+							return nil, err
+						}
+						j.AllowMissingKeys(false)
+						//buf := new(bytes.Buffer)
+						//err = j.Execute(buf, unstrObj)
+						fullResults, err := j.FindResults(unstrObj)
+						if err != nil {
+							log.Fatalf("jsonpath 2 %v", err)
+							return nil, err
+						}
+						//if len(fullResults) > 1 || len(fullResults[0]) > 1{
+						//	return nil, fmt.Errorf("Failed: Template is ill-formed, it points to multipale values" )
+						//}
+
+						iface, ok := template.PrintableValue(fullResults[0][0])
+						if !ok {
+							return nil, fmt.Errorf("can't print type %s", fullResults[0][0])
+						}
+
+						//if _, ok := iface.([]interface{}); ok {
+						//	fmt.Printf("ARRAY\n")
+						//}
+						//var buffer bytes.Buffer
+						//fmt.Fprint(&buffer, iface)
+
+						var retVal interface{}
+						if transformers, ok := val["format-transformers"].([]interface{}); ok && len(transformers) > 0 {
+							transformNames := make([]string, 0, len(transformers))
+							for _, v := range transformers {
+								if name, ok := v.(string); ok {
+									transformNames = append(transformNames, name)
+								}
+							}
+							retVal, err = CompoundTransformerNames(iface, transformNames...)
+						} else {
+							retVal = iface
+						}
+						fmt.Printf("resolveValue returned %v [%T]\n", retVal, retVal)
+						return retVal, nil
 					}
-					fmt.Printf("resolveValue returned %v [%T]\n", retVal, retVal)
-					return retVal, nil
+					return nil, fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is nor jsonpath formated")
 
 				}
-				return "", fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is nor defined")
+				return nil, fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is nor defined")
 			}
-			return "", fmt.Errorf("Failed: getValueFrom is not well-formed, 'name' is nor defined")
+			return nil, fmt.Errorf("Failed: getValueFrom is not well-formed, 'name' is nor defined")
 
 		}
 		return "", fmt.Errorf("Failed: getValueFrom is not well-formed, 'kind' is nor defined")
@@ -502,6 +495,7 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 	if err != nil && strings.Contains(err.Error(), "not found") {
 		log.Println(err.Error())
 		log.Printf("Creating resource %s/%s\n", namespace, name)
+		fmt.Printf("New Resource %#v\n", resource)
 		err = r.Create(context.TODO(), &resource)
 		if err != nil {
 			log.Printf(err.Error())

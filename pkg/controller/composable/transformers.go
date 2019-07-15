@@ -19,15 +19,18 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 const (
-	Base642String 	= "base642String"
-	String2Base64 	= "string2Base64"
-	Int2String 		= "int2String"
-	String2Int		= "string2Int"
-	Float2String	= "float2String"
-	String2Float	= "string2Float"
+	Base642String 	= "Base642String"
+	String2Base64 	= "String2Base64"
+	//Int2String 		= "int2String"
+	String2Int		= "String2Int"
+	//Float2String	= "float2String"
+	String2Float	= "String2Float"
+	Array2CSString  = "Array2CSString"
+	ToString  		= "ToString"
 )
 
 // Base Transformer function
@@ -64,23 +67,52 @@ func CompoundTransformerNames (value interface{}, transNames ...string) (interfa
 
 func string2Transformer(transformerName string) (Transformer, error) {
 	switch transformerName {
+	case ToString:
+		return ToStringTransformer, nil
 	case Base642String:
 			return Base642StringTransformer, nil
 	case String2Base64:
 			return String2Base64Transformer, nil
-	case Int2String:
-		return Int2StringTransformer, nil
+	//case Int2String:
+	//	return Int2StringTransformer, nil
 	case String2Int:
 		return String2IntTransformer, nil
-	case Float2String:
-		return Float2StringTransformer, nil
+	//case Float2String:
+	//	return Float2StringTransformer, nil
 	case String2Float:
 		return String2FloatTransformer, nil
+	case Array2CSString:
+		return Array2CSStringTransformer, nil
 	default:
 		return nil, fmt.Errorf("Wrong transformer name %v", transformerName)
 	}
 
 }
+
+func Array2CSStringTransformer (value interface{}) (interface{}, error) {
+	var str strings.Builder
+	if strArray, ok := value.([]string); ok {
+		for i, v := range strArray {
+			str.WriteString(v)
+			if i != len(strArray)-1 {
+				str.WriteString(",")
+			}
+		}
+		return str.String(), nil
+	} else if intArray, ok := value.([]interface{}); ok {
+		for i, v := range intArray {
+			if strVal, ok := v.(string); ok {
+				str.WriteString(strVal)
+				if i != len(intArray)-1 {
+					str.WriteString(",")
+				}
+			}
+		}
+		return str.String(), nil
+	}
+	return nil, fmt.Errorf("The given %v has type %T, and it is not a string арраы", value, value)
+}
+
 
 func Base642StringTransformer (value interface{}) (interface{}, error) {
 	if strValue, ok := value.(string); ok {
@@ -105,6 +137,10 @@ func Int2StringTransformer (value interface{}) (interface{}, error) {
 		return strconv.Itoa(intValue), nil
 	}
 	return nil, fmt.Errorf("The given %v has type %T, and it is not an integer", value, value)
+}
+
+func ToStringTransformer (value interface{}) (interface{}, error) {
+	return fmt.Sprintf("%v", value), nil
 }
 
 func String2IntTransformer (value interface{}) (interface{}, error) {
