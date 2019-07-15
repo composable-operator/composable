@@ -293,7 +293,7 @@ func LookupAPIResource(r *ReconcileComposable /*config *rest.Config */, key, tar
 }
 
 func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace string, resources *[]*metav1.APIResourceList) (interface{}, error) {
-
+//fmt.Printf("resolveValue %v\n", value)
 	if val, ok := value.(map[string]interface{}); ok {
 		if kind, ok := val["kind"].(string); ok {
 			res, err := LookupAPIResource(r, kind, "", resources)
@@ -349,7 +349,7 @@ func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace
 						if !ok {
 							return nil, fmt.Errorf("can't print type %s", fullResults[0][0])
 						}
-
+						//fmt.Printf("iface = %v\n", iface)
 						//if _, ok := iface.([]interface{}); ok {
 						//	fmt.Printf("ARRAY\n")
 						//}
@@ -364,6 +364,7 @@ func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace
 									transformNames = append(transformNames, name)
 								}
 							}
+							//fmt.Printf("tr =%v\n", transformNames)
 							retVal, err = CompoundTransformerNames(iface, transformNames...)
 						} else {
 							retVal = iface

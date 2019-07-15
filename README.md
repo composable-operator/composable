@@ -63,16 +63,16 @@ spec:
           
           # [Optional] format-transformers, array of the available values, which are:
           # ToString 		- transforms interface to string
-          # String2Int 		- transforms string to integer
-          # Base642String  	- decodes a base64 encoded string to a plain one
-          # String2Base64	- encodes a plain string to a base 64 encoded string
-          # String2Float    - transforms string to float
-          # Array2CSString  - transforms arrays of objects to a comma-separated string
+          # StringToInt 		- transforms string to integer
+          # Base64ToString  	- decodes a base64 encoded string to a plain one
+          # StringToBase64	- encodes a plain string to a base 64 encoded string
+          # StringToFloat    - transforms string to float
+          # ArrayToCSString  - transforms arrays of objects to a comma-separated string
           # if presents, the operator will transform discovered data to the wished format
           # Example: transform data from base64 encoded string to an integer
           # format-transformer:
-          #  - base642String
-          #  - string2Int
+          #  - base64ToString
+          #  - stringToInt
 ```
 
 In this example, the field `plan` of the `Service.ibmcloud` instance is specified by referring to a secret. When the composable operator is created, its controller tries to read the secret and obtains the data needed for this field. If the secret is available, it then creates the `Service.ibmcloud` resource with the proper configuration. If the secret does not exist, the Composable controller keeps re-trying until it becomes available.
@@ -158,6 +158,11 @@ format-transformers:
 
 * `ToString` - returns a native string representation of any object
 * `Array2CSString` - returns a comma-separated string from array's values 
+* `Base64ToString` - decodes `base64` encoded string
+* `StringToBase64` - encodes a string to `base64` 
+* `StringToInt` - transforms a string to an integer
+* `StringToFloat` - transforms a string to a float
+* `StringToBool` - transforms a string to boolean
 
 ## Deletion
 

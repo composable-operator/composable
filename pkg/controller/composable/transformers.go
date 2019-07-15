@@ -23,13 +23,14 @@ import (
 )
 
 const (
-	Base642String 	= "Base642String"
-	String2Base64 	= "String2Base64"
-	//Int2String 		= "int2String"
-	String2Int		= "String2Int"
+	Base64ToString 	= "Base64ToString"
+	StringToBase64 	= "StringToBase64"
+	//Int2String 	= "int2String"
+	StringToInt		= "StringToInt"
 	//Float2String	= "float2String"
-	String2Float	= "String2Float"
-	Array2CSString  = "Array2CSString"
+	StringToFloat	= "StringToFloat"
+	StringToBool 	= "StringToBool"
+	ArrayToCSString = "ArrayToCSString"
 	ToString  		= "ToString"
 )
 
@@ -69,19 +70,21 @@ func string2Transformer(transformerName string) (Transformer, error) {
 	switch transformerName {
 	case ToString:
 		return ToStringTransformer, nil
-	case Base642String:
+	case Base64ToString:
 			return Base642StringTransformer, nil
-	case String2Base64:
+	case StringToBase64:
 			return String2Base64Transformer, nil
 	//case Int2String:
 	//	return Int2StringTransformer, nil
-	case String2Int:
+	case StringToInt:
 		return String2IntTransformer, nil
 	//case Float2String:
 	//	return Float2StringTransformer, nil
-	case String2Float:
+	case StringToFloat:
 		return String2FloatTransformer, nil
-	case Array2CSString:
+	case StringToBool:
+		return String2BoolTransformer, nil
+	case ArrayToCSString:
 		return Array2CSStringTransformer, nil
 	default:
 		return nil, fmt.Errorf("Wrong transformer name %v", transformerName)
@@ -172,3 +175,13 @@ func String2FloatTransformer (value interface{}) (interface{}, error) {
 	return nil, fmt.Errorf("The given %v has type %T, and it is not a string", value, value)
 }
 
+func String2BoolTransformer (value interface{}) (interface{}, error) {
+	if strValue, ok := value.(string); ok {
+		if f, err := strconv.ParseBool(strValue); err == nil {
+			return f, nil
+		} else {
+			return nil, err
+		}
+	}
+	return nil, fmt.Errorf("The given %v has type %T, and it is not a string", value, value)
+}
