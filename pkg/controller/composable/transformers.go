@@ -18,6 +18,7 @@ package composable
 import (
 	"encoding/base64"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 )
@@ -25,9 +26,7 @@ import (
 const (
 	Base64ToString 	= "Base64ToString"
 	StringToBase64 	= "StringToBase64"
-	//Int2String 	= "int2String"
 	StringToInt		= "StringToInt"
-	//Float2String	= "float2String"
 	StringToFloat	= "StringToFloat"
 	StringToBool 	= "StringToBool"
 	ArrayToCSString = "ArrayToCSString"
@@ -74,12 +73,8 @@ func string2Transformer(transformerName string) (Transformer, error) {
 			return Base642StringTransformer, nil
 	case StringToBase64:
 			return String2Base64Transformer, nil
-	//case Int2String:
-	//	return Int2StringTransformer, nil
 	case StringToInt:
 		return String2IntTransformer, nil
-	//case Float2String:
-	//	return Float2StringTransformer, nil
 	case StringToFloat:
 		return String2FloatTransformer, nil
 	case StringToBool:
@@ -87,35 +82,27 @@ func string2Transformer(transformerName string) (Transformer, error) {
 	case ArrayToCSString:
 		return Array2CSStringTransformer, nil
 	default:
-		return nil, fmt.Errorf("Wrong transformer name %v", transformerName)
+		return nil, fmt.Errorf("Wrong transformer name %q", transformerName)
 	}
 
 }
 
-func Array2CSStringTransformer (value interface{}) (interface{}, error) {
+func Array2CSStringTransformer (intValue interface{}) (interface{}, error) {
 	var str strings.Builder
-	if strArray, ok := value.([]string); ok {
-		for i, v := range strArray {
-			str.WriteString(v)
-			if i != len(strArray)-1 {
+	switch reflect.TypeOf(intValue).Kind() {
+	case reflect.Slice, reflect.Array:
+		s := reflect.ValueOf(intValue)
+		for i := 0; i < s.Len(); i++ {
+			str.WriteString(fmt.Sprintf("%v", s.Index(i)))
+			if i != s.Len()-1 {
 				str.WriteString(",")
 			}
 		}
 		return str.String(), nil
-	} else if intArray, ok := value.([]interface{}); ok {
-		for i, v := range intArray {
-			if strVal, ok := v.(string); ok {
-				str.WriteString(strVal)
-				if i != len(intArray)-1 {
-					str.WriteString(",")
-				}
-			}
-		}
-		return str.String(), nil
+	default:
+		return fmt.Sprintf("%v", intValue), nil
 	}
-	return nil, fmt.Errorf("The given %v has type %T, and it is not a string арраы", value, value)
 }
-
 
 func Base642StringTransformer (value interface{}) (interface{}, error) {
 	if strValue, ok := value.(string); ok {
@@ -135,13 +122,6 @@ func String2Base64Transformer (value interface{}) (interface{}, error) {
 	return nil, fmt.Errorf("The given %v has type %T, and it is not a string", value, value)
 }
 
-func Int2StringTransformer (value interface{}) (interface{}, error) {
-	if intValue, ok := value.(int); ok {
-		return strconv.Itoa(intValue), nil
-	}
-	return nil, fmt.Errorf("The given %v has type %T, and it is not an integer", value, value)
-}
-
 func ToStringTransformer (value interface{}) (interface{}, error) {
 	return fmt.Sprintf("%v", value), nil
 }
@@ -155,13 +135,6 @@ func String2IntTransformer (value interface{}) (interface{}, error) {
 		}
 	}
 	return nil, fmt.Errorf("The given %v has type %T, and it is not a string", value, value)
-}
-
-func Float2StringTransformer (value interface{}) (interface{}, error) {
-	if floatValue, ok := value.(float64); ok {
-		return fmt.Sprintf("%f", floatValue), nil
-	}
-	return nil, fmt.Errorf("The given %v has type %T, and it is not a float", value, value)
 }
 
 func String2FloatTransformer (value interface{}) (interface{}, error) {
