@@ -24,20 +24,20 @@ import (
 )
 
 const (
-	Base64ToString 	= "Base64ToString"
-	StringToBase64 	= "StringToBase64"
-	StringToInt		= "StringToInt"
-	StringToFloat	= "StringToFloat"
-	StringToBool 	= "StringToBool"
+	Base64ToString  = "Base64ToString"
+	StringToBase64  = "StringToBase64"
+	StringToInt     = "StringToInt"
+	StringToFloat   = "StringToFloat"
+	StringToBool    = "StringToBool"
 	ArrayToCSString = "ArrayToCSString"
-	ToString  		= "ToString"
+	ToString        = "ToString"
 )
 
 // Base Transformer function
 type Transformer func(interface{}) (interface{}, error)
 
 // Compound Transformer function
-func CompoundTransformer (value interface{}, transformers ...Transformer) (interface{}, error) {
+func CompoundTransformer(value interface{}, transformers ...Transformer) (interface{}, error) {
 	tempValue := value
 	var err error
 	for _, tr := range transformers {
@@ -50,7 +50,7 @@ func CompoundTransformer (value interface{}, transformers ...Transformer) (inter
 }
 
 // Compound Transformer function
-func CompoundTransformerNames (value interface{}, transNames ...string) (interface{}, error) {
+func CompoundTransformerNames(value interface{}, transNames ...string) (interface{}, error) {
 	tempValue := value
 	for _, trName := range transNames {
 		tr, err := string2Transformer(trName)
@@ -70,9 +70,9 @@ func string2Transformer(transformerName string) (Transformer, error) {
 	case ToString:
 		return ToStringTransformer, nil
 	case Base64ToString:
-			return Base642StringTransformer, nil
+		return Base642StringTransformer, nil
 	case StringToBase64:
-			return String2Base64Transformer, nil
+		return String2Base64Transformer, nil
 	case StringToInt:
 		return String2IntTransformer, nil
 	case StringToFloat:
@@ -87,7 +87,7 @@ func string2Transformer(transformerName string) (Transformer, error) {
 
 }
 
-func Array2CSStringTransformer (intValue interface{}) (interface{}, error) {
+func Array2CSStringTransformer(intValue interface{}) (interface{}, error) {
 	var str strings.Builder
 	switch reflect.TypeOf(intValue).Kind() {
 	case reflect.Slice, reflect.Array:
@@ -104,7 +104,7 @@ func Array2CSStringTransformer (intValue interface{}) (interface{}, error) {
 	}
 }
 
-func Base642StringTransformer (value interface{}) (interface{}, error) {
+func Base642StringTransformer(value interface{}) (interface{}, error) {
 	if strValue, ok := value.(string); ok {
 		decoded, err := base64.StdEncoding.DecodeString(strValue)
 		if err != nil {
@@ -115,18 +115,18 @@ func Base642StringTransformer (value interface{}) (interface{}, error) {
 	return nil, fmt.Errorf("The given %v has type %T, and it is not a string", value, value)
 }
 
-func String2Base64Transformer (value interface{}) (interface{}, error) {
+func String2Base64Transformer(value interface{}) (interface{}, error) {
 	if strValue, ok := value.(string); ok {
 		return base64.StdEncoding.EncodeToString([]byte(strValue)), nil
 	}
 	return nil, fmt.Errorf("The given %v has type %T, and it is not a string", value, value)
 }
 
-func ToStringTransformer (value interface{}) (interface{}, error) {
+func ToStringTransformer(value interface{}) (interface{}, error) {
 	return fmt.Sprintf("%v", value), nil
 }
 
-func String2IntTransformer (value interface{}) (interface{}, error) {
+func String2IntTransformer(value interface{}) (interface{}, error) {
 	if strValue, ok := value.(string); ok {
 		if n, err := strconv.Atoi(strValue); err == nil {
 			return n, nil
@@ -137,7 +137,7 @@ func String2IntTransformer (value interface{}) (interface{}, error) {
 	return nil, fmt.Errorf("The given %v has type %T, and it is not a string", value, value)
 }
 
-func String2FloatTransformer (value interface{}) (interface{}, error) {
+func String2FloatTransformer(value interface{}) (interface{}, error) {
 	if strValue, ok := value.(string); ok {
 		if f, err := strconv.ParseFloat(strValue, 64); err == nil {
 			return f, nil
@@ -148,7 +148,7 @@ func String2FloatTransformer (value interface{}) (interface{}, error) {
 	return nil, fmt.Errorf("The given %v has type %T, and it is not a string", value, value)
 }
 
-func String2BoolTransformer (value interface{}) (interface{}, error) {
+func String2BoolTransformer(value interface{}) (interface{}, error) {
 	if strValue, ok := value.(string); ok {
 		if f, err := strconv.ParseBool(strValue); err == nil {
 			return f, nil

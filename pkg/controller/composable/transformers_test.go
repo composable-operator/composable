@@ -20,14 +20,15 @@ import (
 )
 
 type Planet struct {
-	Name string
+	Name     string
 	YearSpan int
 }
+
 func TestArray2CSStringTransformer(t *testing.T) {
 
 	var tests = []struct {
-		value   interface{}
-		exp     string
+		value interface{}
+		exp   string
 	}{
 		{[]string{"a", "b", "cd", "efg"}, "a,b,cd,efg"},
 		{[]int32{1, 2, 34, 567}, "1,2,34,567"},
@@ -35,12 +36,11 @@ func TestArray2CSStringTransformer(t *testing.T) {
 		{[]float32{1.1, 2.2, 34.3, 567.0, 1.234560e+02}, "1.1,2.2,34.3,567,123.456"},
 		{[]float64{1.1, 2.2, 34.3, 567.0, 1.234560e+02}, "1.1,2.2,34.3,567,123.456"},
 		{[]bool{true, false, true}, "true,false,true"},
-		{[]Planet{ {Name: "Mercury", YearSpan: 88 }, {Name: "Venus", YearSpan: 243}, {Name: "Earth", YearSpan: 365 }},
+		{[]Planet{{Name: "Mercury", YearSpan: 88}, {Name: "Venus", YearSpan: 243}, {Name: "Earth", YearSpan: 365}},
 			"{Mercury 88},{Venus 243},{Earth 365}"},
 		{"test", "test"},
 		{12, "12"},
 		{true, "true"},
-
 	}
 
 	for _, e := range tests {
@@ -54,7 +54,7 @@ func TestArray2CSStringTransformer(t *testing.T) {
 			if strRetValue == e.exp {
 				continue
 			}
-			t.Fatalf("retruned str %q is not equal to expected string %q",strRetValue, e.exp )
+			t.Fatalf("retruned str %q is not equal to expected string %q", strRetValue, e.exp)
 		}
 		t.Fatalf("retruned value is not string [%T]", retValue)
 	}
@@ -62,9 +62,9 @@ func TestArray2CSStringTransformer(t *testing.T) {
 
 func TestCompoundTransformerNames(t *testing.T) {
 	var tests = []struct {
-		value   			interface{}
-		transformerNames 	[]string
-		exp     			interface{}
+		value            interface{}
+		transformerNames []string
+		exp              interface{}
 	}{
 		{12, []string{ToString, StringToInt}, 12},
 		{"12", []string{StringToInt, ToString}, "12"},
@@ -83,7 +83,7 @@ func TestCompoundTransformerNames(t *testing.T) {
 		}
 		t.Logf("retValue = %v\n", retValue)
 		if retValue != e.exp {
-			t.Fatalf("retruned value [%v] is not equal to expected one [%v]",retValue, e.exp )
+			t.Fatalf("retruned value [%v] is not equal to expected one [%v]", retValue, e.exp)
 		}
 	}
 
