@@ -25,7 +25,7 @@ The Composable Operator enables the complete declarative executable specificatio
 
 To install the Composable operator, do the following:
 ```shell
-git clone git@github.ibm.com:seed/composable.git
+git clone git@github.com:IBM/composable.git
 ./composable/hack/install-composable.sh [namespace]
 ```
 An optional [namespace] argument specifies the namespace in which the controller pod will run. If a namespace is not provided, the controller pod will run in the `default` namespace.

@@ -1,6 +1,6 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= registry.ng.bluemix.net/seed/composable-controller:v0.1.0
+IMG ?= composable-controller
 
 all: test manager
 
@@ -10,7 +10,7 @@ test: generate fmt vet manifests
 
 # Build manager binary
 manager: generate fmt vet
-	go build -o bin/manager github.ibm.com/seed/composable/cmd/manager
+	go build -o bin/manager github.com/IBM/composable/cmd/manager
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet
@@ -41,12 +41,28 @@ vet:
 generate:
 	go generate ./pkg/... ./cmd/...
 
-docker-build:
+# Build the docker image
+docker-build: check-tag
 	docker build --no-cache . -t ${IMG}
 	@echo "updating kustomize image patch file for manager resource"
 	sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
 
 # Push the docker image
 docker-push:
-	docker login -u token -p ${DOCKER_REGISTRY_TOKEN} registry.ng.bluemix.net
-	docker push ${IMG}
+	echo "${DOCKER_PASSWORD}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
+	docker push ${IMG}:${TAG}
+
+check-tag:
+ifndef TAG
+	$(error TAG is undefined! Please set TAG to the latest release tag, using the format x.y.z e.g. export TAG=0.1.1 )
+endif
+
+check-quayns:
+ifndef QUAY_NS
+	$(error QUAY_NS is undefined!)
+endif
+
+check-quaytoken:
+ifndef QUAY_TOKEN
+	$(error QUAY_TOKEN is undefined!)
+endif

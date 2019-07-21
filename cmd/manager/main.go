@@ -1,5 +1,4 @@
 /*
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -20,8 +19,8 @@ import (
 	"log"
 	"os"
 
-	"github.ibm.com/seed/composable/pkg/apis"
-	"github.ibm.com/seed/composable/pkg/controller"
+	"github.com/IBM/composable/pkg/apis"
+	"github.com/IBM/composable/pkg/controller"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
 	"k8s.io/client-go/rest"

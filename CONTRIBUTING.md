@@ -12,14 +12,14 @@ as well as the guidelines we follow for how our documents are formatted.
 
 To report an issue, or to suggest an idea for a change that you haven't
 had time to write-up yet, open an
-[issue](https://github.ibm.com/seed/composable/issues). It is best to check
-our existing [issues](https://github.ibm.com/seed/composable/issues) first
+[issue](https://github.com/IBM/composable/issues). It is best to check
+our existing [issues](https://github.com/IBM/composable/issues) first
 to see if a similar one has already been opened and discussed.
 
 ## Suggesting a Change
 
 To suggest a change to this repository, submit a [pull
-request](https://github.ibm.com/seed/composable/pulls)(PR) with the complete
+request](https://github.com/IBM/composable/pulls)(PR) with the complete
 set of changes you'd like to see. See the
 [Code Style](#code-style) section for
 the guidelines we follow for how documents are formatted.

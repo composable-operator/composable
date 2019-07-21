@@ -1,5 +1,4 @@
 /*
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -16,7 +15,7 @@ limitations under the License.
 package apis
 
 import (
-	"github.ibm.com/seed/composable/pkg/apis/ibmcloud/v1alpha1"
+	"github.com/IBM/composable/pkg/apis/ibmcloud/v1alpha1"
 )
 
 func init() {

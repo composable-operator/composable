@@ -25,7 +25,7 @@ spec:
         - "-v=5"
         command:
         - ./manager
-        image: registry.ng.bluemix.net/seed/composable-controller:v0.1.0
+        image: composable-controller:v0.1.0
         imagePullPolicy: Always
         name: composable
       imagePullSecrets:
