@@ -1,5 +1,4 @@
 /*
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
@@ -141,11 +140,11 @@ func resolve(r *ReconcileComposable, object interface{}, composableNamespace str
 	if err != nil {
 		return unstructured.Unstructured{}, err
 	}
-	ret := unstructured.Unstructured{ Object: obj.(map[string]interface{}) }
+	ret := unstructured.Unstructured{Object: obj.(map[string]interface{})}
 	return ret, nil
 }
 
-func resolveFields(r *ReconcileComposable, fields interface{}, composableNamespace string, resources *[]*metav1.APIResourceList)  (interface{}, error) {
+func resolveFields(r *ReconcileComposable, fields interface{}, composableNamespace string, resources *[]*metav1.APIResourceList) (interface{}, error) {
 
 	switch fields.(type) {
 	case map[string]interface{}:
@@ -159,7 +158,7 @@ func resolveFields(r *ReconcileComposable, fields interface{}, composableNamespa
 						return nil, err
 					}
 					fields = newFields
-				}  else if values, ok := v.(map[string]interface{}); ok {
+				} else if values, ok := v.(map[string]interface{}); ok {
 					if value, ok := values[getValueFrom]; ok {
 						if len(values) > 1 {
 							return nil, fmt.Errorf("Failed: Template is ill-formed. GetValueFrom must be the only field in a value")
@@ -293,17 +292,15 @@ func LookupAPIResource(r *ReconcileComposable /*config *rest.Config */, key, tar
 }
 
 func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace string, resources *[]*metav1.APIResourceList) (interface{}, error) {
-//fmt.Printf("resolveValue %v\n", value)
 	if val, ok := value.(map[string]interface{}); ok {
 		if kind, ok := val["kind"].(string); ok {
 			res, err := LookupAPIResource(r, kind, "", resources)
 			if err != nil {
-				fmt.Printf("Error: %v\n", err)
 				return "", err
 			}
 			if name, ok := val["name"].(string); ok {
 				if path, ok := val["path"].(string); ok {
-					if ! strings.HasPrefix("path", "{.") {
+					if !strings.HasPrefix("path", "{.") {
 						var objNamespacedname types.NamespacedName
 						if res.Namespaced {
 							namespace, ok := val["namespace"].(string)
@@ -321,7 +318,6 @@ func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace
 						unstrObj.SetGroupVersionKind(groupVersionKind)
 						err = r.Get(context.TODO(), objNamespacedname, &unstrObj)
 						if err != nil {
-							fmt.Printf("Error: %v\n", err)
 							return nil, err
 						}
 						j := jsonpath.New("compose")
@@ -349,12 +345,6 @@ func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace
 						if !ok {
 							return nil, fmt.Errorf("can't print type %s", fullResults[0][0])
 						}
-						//fmt.Printf("iface = %v\n", iface)
-						//if _, ok := iface.([]interface{}); ok {
-						//	fmt.Printf("ARRAY\n")
-						//}
-						//var buffer bytes.Buffer
-						//fmt.Fprint(&buffer, iface)
 
 						var retVal interface{}
 						if transformers, ok := val["format-transformers"].([]interface{}); ok && len(transformers) > 0 {
@@ -364,7 +354,6 @@ func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace
 									transformNames = append(transformNames, name)
 								}
 							}
-							//fmt.Printf("tr =%v\n", transformNames)
 							retVal, err = CompoundTransformerNames(iface, transformNames...)
 						} else {
 							retVal = iface
@@ -432,7 +421,11 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 			return reconcile.Result{}, nil
 		}
 	}
-
+	if instance.Spec.Template == nil {
+		// The object's spec doesn't contain `Template`
+		fmt.Printf("Template is nil, return \n")
+		return reconcile.Result{}, nil
+	}
 	object, err := toJSONFromRaw(instance.Spec.Template)
 	if err != nil {
 		r.errorHandler(instance, err, PendingStatus, "", "Failed to read template data:")
@@ -496,14 +489,12 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 	if err != nil && strings.Contains(err.Error(), "not found") {
 		log.Println(err.Error())
 		log.Printf("Creating resource %s/%s\n", namespace, name)
-		fmt.Printf("New Resource %#v\n", resource)
 		err = r.Create(context.TODO(), &resource)
 		if err != nil {
 			log.Printf(err.Error())
 			if instance.Status.State != FailedStatus {
 				r.errorHandler(instance, err, FailedStatus, "Failed", "")
 			}
-			fmt.Println("Return 1")
 			return reconcile.Result{}, nil
 		}
 
@@ -514,13 +505,10 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 		})
 		if err != nil {
 			r.errorHandler(instance, err, FailedStatus, "", "")
-			fmt.Println("Return 2")
 			return reconcile.Result{}, nil
 		}
 	} else if err != nil {
-		fmt.Printf("ERROR %v\n", err)
 		r.errorHandler(instance, err, FailedStatus, "", "")
-		fmt.Println("Return 3")
 		return reconcile.Result{}, nil
 	}
 
@@ -531,7 +519,6 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 		err = r.Update(context.TODO(), found)
 		if err != nil {
 			r.errorHandler(instance, err, FailedStatus, "", "")
-			fmt.Println("Return 4")
 			return reconcile.Result{}, nil
 		}
 	}
@@ -541,10 +528,8 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 	err = r.Update(context.TODO(), instance)
 	if err != nil {
 		r.errorHandler(instance, err, FailedStatus, "", "")
-		fmt.Println("Return 4.5")
 		return reconcile.Result{}, err
 	}
-	fmt.Println("Return 5")
 	return reconcile.Result{}, nil
 }
 
