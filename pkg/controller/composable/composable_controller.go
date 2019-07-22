@@ -46,6 +46,16 @@ import (
 
 const (
 	getValueFrom  = "getValueFrom"
+	defaultValue  = "defaultValue"
+	name          = "name"
+	path          = "path"
+	namespace     = "namespace"
+    metadata      = "metadata"
+    kind          = "kind"
+    spec          = "spec"
+    objectPrefix  = ".Object"
+	transformers  = "format-transformers"
+
 	FailedStatus  = "Failed"
 	PendingStatus = "Pending"
 	OnlineStatus  = "Online"
@@ -125,12 +135,12 @@ func toJSONFromRaw(content *runtime.RawExtension) (interface{}, error) {
 func resolve(r *ReconcileComposable, object interface{}, composableNamespace string) (unstructured.Unstructured, error) {
 	// Set namespace if undefined
 	objMap := object.(map[string]interface{})
-	if _, ok := objMap["metadata"]; !ok {
+	if _, ok := objMap[metadata]; !ok {
 		return unstructured.Unstructured{}, fmt.Errorf("Failed: Template has no metadata section")
 	}
-	if metadata, ok := objMap["metadata"].(map[string]interface{}); ok {
-		if _, ok := metadata["namespace"]; !ok {
-			metadata["namespace"] = composableNamespace
+	if metadata, ok := objMap[metadata].(map[string]interface{}); ok {
+		if _, ok := metadata[namespace]; !ok {
+			metadata[namespace] = composableNamespace
 		}
 	} else {
 		return unstructured.Unstructured{}, fmt.Errorf("Failed: Template has an ill-defined metadata section")
@@ -293,17 +303,17 @@ func LookupAPIResource(r *ReconcileComposable /*config *rest.Config */, key, tar
 
 func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace string, resources *[]*metav1.APIResourceList) (interface{}, error) {
 	if val, ok := value.(map[string]interface{}); ok {
-		if kind, ok := val["kind"].(string); ok {
+		if kind, ok := val[kind].(string); ok {
 			res, err := LookupAPIResource(r, kind, "", resources)
 			if err != nil {
 				return "", err
 			}
-			if name, ok := val["name"].(string); ok {
-				if path, ok := val["path"].(string); ok {
-					if !strings.HasPrefix("path", "{.") {
+			if name, ok := val[name].(string); ok {
+				if path, ok := val[path].(string); ok {
+					if strings.HasPrefix(path, "{.") {
 						var objNamespacedname types.NamespacedName
 						if res.Namespaced {
-							namespace, ok := val["namespace"].(string)
+							namespace, ok := val[namespace].(string)
 							if !ok {
 								namespace = composableNamespace
 							}
@@ -318,28 +328,35 @@ func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace
 						unstrObj.SetGroupVersionKind(groupVersionKind)
 						err = r.Get(context.TODO(), objNamespacedname, &unstrObj)
 						if err != nil {
+							if errors.IsNotFound(err) {
+								if defaultValue, ok := val[defaultValue]; ok {
+									log.Printf("Return default value %v\n", defaultValue)
+									return defaultValue, nil
+								}
+							}
 							return nil, err
 						}
 						j := jsonpath.New("compose")
 						// add ".Object" to the path
-						path = path[:1] + ".Object" + path[1:]
+						path = path[:1] + objectPrefix + path[1:]
 						err = j.Parse(path)
-
 						if err != nil {
 							log.Fatalf("jsonpath 1.5 %v", err)
 							return nil, err
 						}
 						j.AllowMissingKeys(false)
-						//buf := new(bytes.Buffer)
-						//err = j.Execute(buf, unstrObj)
+
 						fullResults, err := j.FindResults(unstrObj)
 						if err != nil {
-							log.Fatalf("jsonpath 2 %v", err)
+							if strings.Contains(err.Error(), "is not found") {
+								if defaultValue, ok := val[defaultValue]; ok {
+									log.Printf("Return default value %v\n", defaultValue)
+									return defaultValue, nil
+								}
+							}
 							return nil, err
 						}
-						//if len(fullResults) > 1 || len(fullResults[0]) > 1{
-						//	return nil, fmt.Errorf("Failed: Template is ill-formed, it points to multipale values" )
-						//}
+						// TODO check default
 
 						iface, ok := template.PrintableValue(fullResults[0][0])
 						if !ok {
@@ -347,7 +364,7 @@ func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace
 						}
 
 						var retVal interface{}
-						if transformers, ok := val["format-transformers"].([]interface{}); ok && len(transformers) > 0 {
+						if transformers, ok := val[transformers].([]interface{}); ok && len(transformers) > 0 {
 							transformNames := make([]string, 0, len(transformers))
 							for _, v := range transformers {
 								if name, ok := v.(string); ok {
@@ -358,18 +375,18 @@ func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace
 						} else {
 							retVal = iface
 						}
-						fmt.Printf("resolveValue returned %v [%T]\n", retVal, retVal)
+						log.Printf("resolveValue returned %v [%T]\n", retVal, retVal)
 						return retVal, nil
 					}
-					return nil, fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is nor jsonpath formated")
+					return nil, fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is not jsonpath formated")
 
 				}
-				return nil, fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is nor defined")
+				return nil, fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is not defined")
 			}
-			return nil, fmt.Errorf("Failed: getValueFrom is not well-formed, 'name' is nor defined")
+			return nil, fmt.Errorf("Failed: getValueFrom is not well-formed, 'name' is not defined")
 
 		}
-		return "", fmt.Errorf("Failed: getValueFrom is not well-formed, 'kind' is nor defined")
+		return "", fmt.Errorf("Failed: getValueFrom is not well-formed, 'kind' is not defined")
 	}
 	return "", fmt.Errorf("Failed: getValueFrom is not well-formed")
 }
@@ -423,7 +440,6 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 	}
 	if instance.Spec.Template == nil {
 		// The object's spec doesn't contain `Template`
-		fmt.Printf("Template is nil, return \n")
 		return reconcile.Result{}, nil
 	}
 	object, err := toJSONFromRaw(instance.Spec.Template)
@@ -441,7 +457,6 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 		r.errorHandler(instance, err, PendingStatus, "", "Problem resolving template:")
 		return reconcile.Result{}, err
 	}
-	log.Println(resource)
 
 	name, err := getName(resource.Object)
 	if err != nil {
@@ -480,13 +495,11 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 		r.errorHandler(instance, err, PendingStatus, "", "")
 		return reconcile.Result{}, err
 	}
-
 	found := &unstructured.Unstructured{}
 	found.SetAPIVersion(apiversion)
 	found.SetKind(kind)
-
 	err = r.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, found)
-	if err != nil && strings.Contains(err.Error(), "not found") {
+	if err != nil && errors.IsNotFound(err) {
 		log.Println(err.Error())
 		log.Printf("Creating resource %s/%s\n", namespace, name)
 		err = r.Create(context.TODO(), &resource)
@@ -511,18 +524,17 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 		r.errorHandler(instance, err, FailedStatus, "", "")
 		return reconcile.Result{}, nil
 	}
-
 	// Update the found object and write the result back if there are any changes
-	if !reflect.DeepEqual(resource.Object["Spec"], found.Object["Spec"]) {
-		found.Object["Spec"] = resource.Object["Spec"]
+	if !reflect.DeepEqual(resource.Object[spec], found.Object[spec]) {
+		found.Object[spec] = resource.Object[spec]
 		log.Printf("Updating Resource %s/%s\n", namespace, name)
 		err = r.Update(context.TODO(), found)
 		if err != nil {
 			r.errorHandler(instance, err, FailedStatus, "", "")
+			log.Println("7")
 			return reconcile.Result{}, nil
 		}
 	}
-
 	instance.Status.State = OnlineStatus
 	instance.Status.Message = time.Now().Format(time.RFC850)
 	err = r.Update(context.TODO(), instance)

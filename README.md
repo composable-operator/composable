@@ -28,7 +28,7 @@ To install the Composable operator, do the following:
 git clone git@github.com:IBM/composable.git
 ./composable/hack/install-composable.sh [namespace]
 ```
-An optional [namespace] argument specifies the namespace in which the controller pod will run. If a namespace is not provided, the controller pod will run in the `default` namespace.
+An optional [namespace] argument spec`ifies the namespace in which the controller pod will run. If a namespace is not provided, the controller pod will run in the `default` namespace.
 
 ## Examples
 
@@ -60,6 +60,10 @@ spec:
           
           # [Optional] the discovered object's namespace, if doesn't present, the Composable object namespace will be used
           # namespace: my-namespace
+          
+          # [Optional] if present, and the destination value cannot resolved, if for example a checking object does not . 
+          # or the field is not set, teh default value will be used instead. 
+          # defaultValue: "value"
           
           # [Optional] format-transformers, array of the available values, which are:
           # ToString 		- transforms interface to string
