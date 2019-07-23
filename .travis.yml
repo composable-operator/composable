@@ -1,0 +1,41 @@
+language: go
+go:
+  - "1.11.x"
+dist: xenial
+services:
+  - docker
+
+go_import_path: github.com/IBM/composable
+
+before_script:
+  - make deps
+ 
+before_install:
+  - source ./tools/travis/travis-env.sh
+  - source ./hack/latest_tag
+  - ./tools/travis/k8s-tools.sh
+
+script:
+  - make generate
+  - make lintall
+  - make test
+
+after_success:
+  - make push
+  - test "$TRAVIS_EVENT_TYPE" != "pull_request" && make docker-build || echo "success"
+
+#  build only master and tagged/branch releases.
+branches:
+  only: 
+    - master
+    - /^[0-9]+\..*$/
+    - /^v[0-9]+\..*$/
+    - /^release-[0-9]+\..*$/
+
+deploy:
+  skip_cleanup: true
+  provider: script
+  script: bash -c "make docker-push"
+  on:
+    all_branches: true
+    condition: $TRAVIS_BRANCH =~ ^master|[0-9]+\..*|v[0-9]+\..*|release-[0-9]+\..*$

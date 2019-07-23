@@ -1,6 +1,6 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= composable-controller
+IMG ?= cloudoperators/composable-controller
 
 all: test manager
 
