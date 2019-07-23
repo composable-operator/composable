@@ -4,6 +4,16 @@ IMG ?= cloudoperators/composable-controller
 
 all: test manager
 
+# Install dependencies
+deps:
+	go get golang.org/x/lint/golint
+	go get -u github.com/apg/patter
+	go get -u github.com/wadey/gocovmerge
+	go get -u github.com/alecthomas/gometalinter
+	gometalinter --install
+	pip install --user PyYAML
+
+
 # Run tests
 test: generate fmt vet manifests
 	go test ./pkg/... ./cmd/... -coverprofile cover.out
@@ -51,6 +61,12 @@ docker-build: check-tag
 docker-push:
 	echo "${DOCKER_PASSWORD}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
 	docker push ${IMG}:${TAG}
+
+.PHONY: lintall
+lintall: fmt lint vet
+
+lint:
+	golint -set_exit_status=true pkg/
 
 check-tag:
 ifndef TAG
