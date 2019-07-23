@@ -45,16 +45,16 @@ import (
 )
 
 const (
-	getValueFrom  = "getValueFrom"
-	defaultValue  = "defaultValue"
-	name          = "name"
-	path          = "path"
-	namespace     = "namespace"
-    metadata      = "metadata"
-    kind          = "kind"
-    spec          = "spec"
-    objectPrefix  = ".Object"
-	transformers  = "format-transformers"
+	getValueFrom = "getValueFrom"
+	defaultValue = "defaultValue"
+	name         = "name"
+	path         = "path"
+	namespace    = "namespace"
+	metadata     = "metadata"
+	kind         = "kind"
+	spec         = "spec"
+	objectPrefix = ".Object"
+	transformers = "format-transformers"
 
 	FailedStatus  = "Failed"
 	PendingStatus = "Pending"
