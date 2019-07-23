@@ -49,10 +49,10 @@ spec:
       plan: 
         getValueFrom:
           # any Kubernetes or CRD Kind
-          kind: Secret 
+          kind: Service
           
           # The discovered object name
-          name: mysecret
+          name: myservice
           
           # The jsonpath style path to the field
           # Example: get value of nodePort from a service ports array, when the port name is "http"
@@ -108,7 +108,7 @@ spec:
         getValueFrom:
           kind: Secret 
           name: mysecret
-          path: {.data.plan}
+          path: {.data.planKey}
  ```
  
  In the above example, the name of the underlying `Service.ibmcloud` instance is obtained from a `configmap` and the same 
