@@ -1,3 +1,4 @@
+-include $(shell curl -sSL -o .build-harness "https://git.io/build-harness"; echo .build-harness)
 
 # Image URL to use all building/pushing image targets
 IMG ?= cloudoperators/composable-controller
@@ -53,7 +54,7 @@ generate:
 
 # Build the docker image
 docker-build: check-tag
-	docker build --no-cache . -t ${IMG}
+	docker build --no-cache . -t ${IMG}:${TAG}
 	@echo "updating kustomize image patch file for manager resource"
 	sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
 
