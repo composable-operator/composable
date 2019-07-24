@@ -61,8 +61,11 @@ spec:
           # [Optional] the discovered object's namespace, if doesn't present, the Composable object namespace will be used
           # namespace: my-namespace
           
+          # [Optional] the desire object version, e.g. "v1", "v1alpha1", "v1beta1"
+          # version: v1
+          
           # [Optional] if present, and the destination value cannot resolved, if for example a checking object does not . 
-          # or the field is not set, teh default value will be used instead. 
+          # or the field is not set, the default value will be used instead. 
           # defaultValue: "value"
           
           # [Optional] format-transformers, array of the available values, which are:
@@ -96,6 +99,8 @@ spec:
         getValueFrom:
           kind: ConfigMap
           name: myconfigmap
+          namespace: kube-public
+          version: v1
           path: {.data.name}
     spec:
       instancename: 

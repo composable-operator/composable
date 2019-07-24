@@ -52,6 +52,7 @@ const (
 	namespace    = "namespace"
 	metadata     = "metadata"
 	kind         = "kind"
+	version      = "version"
 	spec         = "spec"
 	objectPrefix = ".Object"
 	transformers = "format-transformers"
@@ -132,7 +133,7 @@ func toJSONFromRaw(content *runtime.RawExtension) (interface{}, error) {
 	return data, nil
 }
 
-func resolve(r *ReconcileComposable, object interface{}, composableNamespace string) (unstructured.Unstructured, error) {
+func (r *ReconcileComposable)resolve(object interface{}, composableNamespace string) (unstructured.Unstructured, error) {
 	// Set namespace if undefined
 	objMap := object.(map[string]interface{})
 	if _, ok := objMap[metadata]; !ok {
@@ -146,7 +147,7 @@ func resolve(r *ReconcileComposable, object interface{}, composableNamespace str
 		return unstructured.Unstructured{}, fmt.Errorf("Failed: Template has an ill-defined metadata section")
 	}
 
-	obj, err := resolveFields(r, object.(map[string]interface{}), composableNamespace, nil)
+	obj, err := r.resolveFields(object.(map[string]interface{}), composableNamespace, nil)
 	if err != nil {
 		return unstructured.Unstructured{}, err
 	}
@@ -154,7 +155,7 @@ func resolve(r *ReconcileComposable, object interface{}, composableNamespace str
 	return ret, nil
 }
 
-func resolveFields(r *ReconcileComposable, fields interface{}, composableNamespace string, resources *[]*metav1.APIResourceList) (interface{}, error) {
+func (r *ReconcileComposable)resolveFields(fields interface{}, composableNamespace string, resources *[]*metav1.APIResourceList) (interface{}, error) {
 
 	switch fields.(type) {
 	case map[string]interface{}:
@@ -163,7 +164,7 @@ func resolveFields(r *ReconcileComposable, fields interface{}, composableNamespa
 				var newFields interface{}
 				var err error
 				if k == getValueFrom {
-					newFields, err = resolveValue(r, v, composableNamespace, resources)
+					newFields, err = r.resolveValue(v, composableNamespace, resources)
 					if err != nil {
 						return nil, err
 					}
@@ -173,9 +174,9 @@ func resolveFields(r *ReconcileComposable, fields interface{}, composableNamespa
 						if len(values) > 1 {
 							return nil, fmt.Errorf("Failed: Template is ill-formed. GetValueFrom must be the only field in a value")
 						}
-						newFields, err = resolveValue(r, value, composableNamespace, resources)
+						newFields, err = r.resolveValue(value, composableNamespace, resources)
 					} else {
-						newFields, err = resolveFields(r, values, composableNamespace, resources)
+						newFields, err = r.resolveFields(values, composableNamespace, resources)
 					}
 					if err != nil {
 						return nil, err
@@ -183,7 +184,7 @@ func resolveFields(r *ReconcileComposable, fields interface{}, composableNamespa
 					fieldsOut[k] = newFields
 				} else if values, ok := v.([]interface{}); ok {
 					for i, value := range values {
-						newFields, err := resolveFields(r, value, composableNamespace, resources)
+						newFields, err := r.resolveFields(value, composableNamespace, resources)
 						if err != nil {
 							return nil, err
 						}
@@ -196,7 +197,7 @@ func resolveFields(r *ReconcileComposable, fields interface{}, composableNamespa
 	case []map[string]interface{}, [][]interface{}:
 		if values, ok := fields.([]interface{}); ok {
 			for i, value := range values {
-				newFields, err := resolveFields(r, value, composableNamespace, resources)
+				newFields, err := r.resolveFields(value, composableNamespace, resources)
 				if err != nil {
 					return nil, err
 				}
@@ -256,8 +257,7 @@ func GroupQualifiedName(apiResource metav1.APIResource) string {
 	return fmt.Sprintf("%s.%s", apiResource.Name, apiResource.Group)
 }
 
-func LookupAPIResource(r *ReconcileComposable /*config *rest.Config */, key, targetVersion string, resources *[]*metav1.APIResourceList) (*metav1.APIResource, error) {
-
+func (r *ReconcileComposable)LookupAPIResource(key, targetVersion string, resources *[]*metav1.APIResourceList) (*metav1.APIResource, error) {
 	if resources == nil {
 		resourceList, err := GetServerPreferredResources(r.config)
 		if err != nil {
@@ -301,12 +301,14 @@ func LookupAPIResource(r *ReconcileComposable /*config *rest.Config */, key, tar
 	return nil, fmt.Errorf("Unable to find api resource named %q.", key)
 }
 
-func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace string, resources *[]*metav1.APIResourceList) (interface{}, error) {
+func (r *ReconcileComposable)resolveValue(value interface{}, composableNamespace string, resources *[]*metav1.APIResourceList) (interface{}, error) {
 	if val, ok := value.(map[string]interface{}); ok {
 		if kind, ok := val[kind].(string); ok {
-			res, err := LookupAPIResource(r, kind, "", resources)
+			vers := ""
+			if vers, ok = val[version].(string); ok {}
+			res, err := r.LookupAPIResource(kind, vers, resources)
 			if err != nil {
-				return "", err
+				return errorToDefaultValue(val, err)
 			}
 			if name, ok := val[name].(string); ok {
 				if path, ok := val[path].(string); ok {
@@ -329,10 +331,7 @@ func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace
 						err = r.Get(context.TODO(), objNamespacedname, &unstrObj)
 						if err != nil {
 							if errors.IsNotFound(err) {
-								if defaultValue, ok := val[defaultValue]; ok {
-									log.Printf("Return default value %v\n", defaultValue)
-									return defaultValue, nil
-								}
+								return errorToDefaultValue(val, err)
 							}
 							return nil, err
 						}
@@ -349,10 +348,7 @@ func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace
 						fullResults, err := j.FindResults(unstrObj)
 						if err != nil {
 							if strings.Contains(err.Error(), "is not found") {
-								if defaultValue, ok := val[defaultValue]; ok {
-									log.Printf("Return default value %v\n", defaultValue)
-									return defaultValue, nil
-								}
+								errorToDefaultValue(val, err)
 							}
 							return nil, err
 						}
@@ -389,6 +385,14 @@ func resolveValue(r *ReconcileComposable, value interface{}, composableNamespace
 		return "", fmt.Errorf("Failed: getValueFrom is not well-formed, 'kind' is not defined")
 	}
 	return "", fmt.Errorf("Failed: getValueFrom is not well-formed")
+}
+
+func errorToDefaultValue(val map[string]interface{}, err error) (interface{}, error) {
+	if defaultValue, ok := val[defaultValue]; ok {
+		log.Printf("Return default value %v\n", defaultValue)
+		return defaultValue, nil
+	}
+	return nil, err
 }
 
 func getName(obj map[string]interface{}) (string, error) {
@@ -448,7 +452,7 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, err
 	}
 
-	resource, err := resolve(r, object, instance.Namespace)
+	resource, err := r.resolve(object, instance.Namespace)
 	if err != nil {
 		if strings.Contains(err.Error(), FailedStatus) {
 			r.errorHandler(instance, err, FailedStatus, "", "")
