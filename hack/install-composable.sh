@@ -21,3 +21,4 @@ NAMESPACE=${1:-"default"}
 
 kubectl get ns $NAMESPACE > /dev/null || kubectl create ns ${NAMESPACE}
 kubectl apply -f ${SCRIPTS_HOME}/../releases/${VERSION} -n ${NAMESPACE}
+cat ${SCRIPTS_HOME}/../releases/${VERSION}/*.tml | sed 's/\$NAMESPACE'"/${NAMESPACE}/g" | kubectl apply -f -

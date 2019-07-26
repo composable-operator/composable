@@ -77,7 +77,7 @@ spec:
           # ArrayToCSString  - transforms arrays of objects to a comma-separated string
           # if presents, the operator will transform discovered data to the wished format
           # Example: transform data from base64 encoded string to an integer
-          # format-transformer:
+          # format-transformers:
           #  - base64ToString
           #  - stringToInt
 ```
@@ -156,17 +156,17 @@ do it. Here are the data transformation roles:
  
 * If there is no data transformers  -  original data format will be used, include complex structures such as maps or arrays.
 * Transformers from the data-transformers array executed one after another according to their order. Which allows 
-creation of data transformation pipelines. For example, teh following snippet defines a data transformation from a base64 
+creation of data transformation pipelines. For example, the following snippet defines a data transformation from a base64 
 encoded string to a plain string and after that to integer. This transformation can be useful to retrieve data from Secretes.
  
 ```yaml
 format-transformers:
- - Base642String
- - String2Int
+ - Base64ToString
+ - StringToInt
 ```  
 
 * `ToString` - returns a native string representation of any object
-* `Array2CSString` - returns a comma-separated string from array's values 
+* `ArrayToCSString` - returns a comma-separated string from array's values 
 * `Base64ToString` - decodes `base64` encoded string
 * `StringToBase64` - encodes a string to `base64` 
 * `StringToInt` - transforms a string to an integer
