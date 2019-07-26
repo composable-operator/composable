@@ -63,6 +63,10 @@ docker-push:
 	echo "${DOCKER_PASSWORD}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
 	docker push ${IMG}:${TAG}
 
+# make a release for olm and releases
+release: check-tag
+	python hack/package.py v${TAG}
+
 .PHONY: lintall
 lintall: fmt lint vet
 
