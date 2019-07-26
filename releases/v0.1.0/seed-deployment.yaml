@@ -25,9 +25,7 @@ spec:
         - "-v=5"
         command:
         - ./manager
-        image: composable-controller:v0.1.0
+        image: cloudoperators/composable-controller:0.1.0
         imagePullPolicy: Always
         name: composable
-      imagePullSecrets:
-      - name: ibmcloud-service-operator-pullsecret
       serviceAccountName: composable-service-account
