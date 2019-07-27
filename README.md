@@ -198,6 +198,6 @@ operations: deploy, retrieve value and deploy, start a job ...
 * Should we provide a separate discovery mechanism to retrieve values from Secrets and ConfigMap.
 	* The path can be changed from `{.Object.data.key}` to `data.key` or even just `key`. 
 	* In any case, we probably have to support transformers.`  
-* Should we eliminate the prefix `Object` in the jsonpath? 
+* ~~Should we eliminate the prefix `Object` in the jsonpath?~~ 
 
            
