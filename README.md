@@ -28,7 +28,7 @@ To install the Composable operator, do the following:
 git clone git@github.com:IBM/composable.git
 ./composable/hack/install-composable.sh [namespace]
 ```
-An optional [namespace] argument spec`ifies the namespace in which the controller pod will run. If a namespace is not provided, the controller pod will run in the `default` namespace.
+An optional [namespace] argument specifies the namespace in which the controller pod will run. If a namespace is not provided, the controller pod will run in the `default` namespace.
 
 ## Examples
 
@@ -75,6 +75,8 @@ spec:
           # StringToBase64	- encodes a plain string to a base 64 encoded string
           # StringToFloat    - transforms string to float
           # ArrayToCSString  - transforms arrays of objects to a comma-separated string
+          # StringToBool - transforms a string to boolean
+          # JsonToObject - transforms a JSON string to an object
           # if presents, the operator will transform discovered data to the wished format
           # Example: transform data from base64 encoded string to an integer
           # format-transformers:
@@ -172,6 +174,8 @@ format-transformers:
 * `StringToInt` - transforms a string to an integer
 * `StringToFloat` - transforms a string to a float
 * `StringToBool` - transforms a string to boolean
+* `JsonToObject` - transforms a JSON string to an object
+* `ObjectToJson` - transforms an object to a JSON string
 
 ## Deletion
 
