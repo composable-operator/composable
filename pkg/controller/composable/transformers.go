@@ -16,6 +16,7 @@ package composable
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -29,6 +30,8 @@ const (
 	StringToFloat   = "StringToFloat"
 	StringToBool    = "StringToBool"
 	ArrayToCSString = "ArrayToCSString"
+	JsonToObject    = "JsonToObject"
+	ObjectToJson    = "ObjectToJson"
 	ToString        = "ToString"
 )
 
@@ -80,6 +83,10 @@ func string2Transformer(transformerName string) (Transformer, error) {
 		return String2BoolTransformer, nil
 	case ArrayToCSString:
 		return Array2CSStringTransformer, nil
+	case JsonToObject:
+		return JsonToObjectTransformer, nil
+	case ObjectToJson:
+		return ObjectToJsonTransformer, nil
 	default:
 		return nil, fmt.Errorf("Wrong transformer name %q", transformerName)
 	}
@@ -101,6 +108,26 @@ func Array2CSStringTransformer(intValue interface{}) (interface{}, error) {
 	default:
 		return fmt.Sprintf("%v", intValue), nil
 	}
+}
+
+func JsonToObjectTransformer(value interface{}) (interface{}, error) {
+	if strValue, ok := value.(string); ok {
+		var data interface{}
+		err := json.Unmarshal([]byte(strValue), &data)
+		if err != nil {
+			return nil, err
+		}
+		return data, nil
+	}
+	return nil, fmt.Errorf("The given %v has type %T, and it is not a JSON string", value, value)
+}
+
+func ObjectToJsonTransformer(value interface{}) (interface{}, error) {
+	retVal, err := json.Marshal(value)
+	if err != nil {
+		return nil, err
+	}
+	return string(retVal), err
 }
 
 func Base642StringTransformer(value interface{}) (interface{}, error) {

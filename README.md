@@ -28,7 +28,7 @@ To install the Composable operator, do the following:
 git clone git@github.com:IBM/composable.git
 ./composable/hack/install-composable.sh [namespace]
 ```
-An optional [namespace] argument spec`ifies the namespace in which the controller pod will run. If a namespace is not provided, the controller pod will run in the `default` namespace.
+An optional [namespace] argument specifies the namespace in which the controller pod will run. If a namespace is not provided, the controller pod will run in the `default` namespace.
 
 ## Examples
 
@@ -75,9 +75,11 @@ spec:
           # StringToBase64	- encodes a plain string to a base 64 encoded string
           # StringToFloat    - transforms string to float
           # ArrayToCSString  - transforms arrays of objects to a comma-separated string
+          # StringToBool - transforms a string to boolean
+          # JsonToObject - transforms a JSON string to an object
           # if presents, the operator will transform discovered data to the wished format
           # Example: transform data from base64 encoded string to an integer
-          # format-transformer:
+          # format-transformers:
           #  - base64ToString
           #  - stringToInt
 ```
@@ -156,22 +158,24 @@ do it. Here are the data transformation roles:
  
 * If there is no data transformers  -  original data format will be used, include complex structures such as maps or arrays.
 * Transformers from the data-transformers array executed one after another according to their order. Which allows 
-creation of data transformation pipelines. For example, teh following snippet defines a data transformation from a base64 
+creation of data transformation pipelines. For example, the following snippet defines a data transformation from a base64 
 encoded string to a plain string and after that to integer. This transformation can be useful to retrieve data from Secretes.
  
 ```yaml
 format-transformers:
- - Base642String
- - String2Int
+ - Base64ToString
+ - StringToInt
 ```  
 
 * `ToString` - returns a native string representation of any object
-* `Array2CSString` - returns a comma-separated string from array's values 
+* `ArrayToCSString` - returns a comma-separated string from array's values 
 * `Base64ToString` - decodes `base64` encoded string
 * `StringToBase64` - encodes a string to `base64` 
 * `StringToInt` - transforms a string to an integer
 * `StringToFloat` - transforms a string to a float
 * `StringToBool` - transforms a string to boolean
+* `JsonToObject` - transforms a JSON string to an object
+* `ObjectToJson` - transforms an object to a JSON string
 
 ## Deletion
 
@@ -194,6 +198,6 @@ operations: deploy, retrieve value and deploy, start a job ...
 * Should we provide a separate discovery mechanism to retrieve values from Secrets and ConfigMap.
 	* The path can be changed from `{.Object.data.key}` to `data.key` or even just `key`. 
 	* In any case, we probably have to support transformers.`  
-* Should we eliminate the prefix `Object` in the jsonpath? 
+* ~~Should we eliminate the prefix `Object` in the jsonpath?~~ 
 
            
