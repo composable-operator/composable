@@ -34,7 +34,7 @@ spec:
     ## Using the Composable Operator
 
     For additional configuration options, samples and more information on using the operator, consult 
-    the [IBM Cloud Operator documentation](https://github.com/IBM/cloud-operators).
+    the [IBM Cloud Operator documentation](https://github.com/IBM/composable).
 
   keywords: ['IBM','Cloud']
   version: PLACEHOLDER
