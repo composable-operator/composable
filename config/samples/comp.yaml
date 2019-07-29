@@ -12,6 +12,5 @@ spec:
       name: mymessagehub
       namespace: default
     spec:
-      instancename: mymessagehub
-      service: Event Streams
-      plan: Standard
+      plan: standard
+      serviceClass: messagehub

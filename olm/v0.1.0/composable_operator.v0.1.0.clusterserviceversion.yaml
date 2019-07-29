@@ -7,8 +7,8 @@ metadata:
     capabilities: Basic Install
     categories: Cloud Provider
     certified: 'false'
-    containerImage: cloudoperators/composable-operator:0.1.0
-    createdAt: '2019-07-29T10:38:13Z'
+    containerImage: cloudoperators/composable-controller:0.1.0
+    createdAt: '2019-07-29T12:29:22Z'
     description: Composable is an overlay operator that can wrap any resource (native
       Kubernetes or CRD instance) and allows it to be dynamically configurable
     repository: https://github.com/IBM/composable
@@ -68,29 +68,11 @@ spec:
       clusterPermissions:
       - rules:
         - apiGroups:
-          - apps
+          - '*'
           resources:
-          - deployments
+          - '*'
           verbs:
-          - get
-          - list
-          - watch
-          - create
-          - update
-          - patch
-          - delete
-        - apiGroups:
-          - ibmcloud.ibm.com
-          resources:
-          - composables
-          verbs:
-          - get
-          - list
-          - watch
-          - create
-          - update
-          - patch
-          - delete
+          - '*'
         serviceAccountName: composable-operator
       deployments:
       - name: composable-operator
@@ -100,6 +82,9 @@ spec:
             matchLabels:
               app: composable-operator
           strategy:
+            rollingUpdate:
+              maxSurge: 25%
+              maxUnavailable: 25%
             type: RollingUpdate
           template:
             metadata:
@@ -107,14 +92,11 @@ spec:
                 app: composable-operator
             spec:
               containers:
-              - args:
-                - -logtostderr=true
-                - -v=5
-                command:
+              - command:
                 - ./manager
-                image: cloudoperators/composable-operator:0.1.0
+                image: cloudoperators/composable-controller:0.1.0
                 imagePullPolicy: Always
-                name: composable-controller
+                name: composable
               serviceAccountName: composable-operator
     strategy: deployment
   installModes:

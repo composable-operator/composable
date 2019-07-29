@@ -3,7 +3,7 @@
 operator_name: composable-operator
 channel_name: alpha
 maturity: alpha
-image: cloudoperators/composable-operator
+image: cloudoperators/composable-controller
 crd:
     - kind: Composable
       description: Overlay operator that allows its underlying object to be dynamically configurable

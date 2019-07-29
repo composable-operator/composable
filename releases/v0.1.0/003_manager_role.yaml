@@ -5,26 +5,8 @@ metadata:
   name: composable-operator-manager-role
 rules:
 - apiGroups:
-  - apps
+  - '*'
   resources:
-  - deployments
+  - '*'
   verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
-- apiGroups:
-  - ibmcloud.ibm.com
-  resources:
-  - composables
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-  - patch
-  - delete
+  - '*'

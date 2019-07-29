@@ -1,4 +1,4 @@
-apiVersion:  apps/v1
+apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
   annotations:
@@ -13,6 +13,9 @@ spec:
     matchLabels:
       app: composable-operator
   strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
     type: RollingUpdate
   template:
     metadata:
@@ -20,12 +23,9 @@ spec:
         app: composable-operator
     spec:
       containers:
-      - args:
-        - "-logtostderr=true"
-        - "-v=5"
-        command:
+      - command:
         - ./manager
         image: PLACEHOLDER
         imagePullPolicy: Always
-        name: composable-controller
+        name: composable
       serviceAccountName: composable-operator
