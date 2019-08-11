@@ -1,0 +1,61 @@
+# Constants used to package the operator for operator hub
+
+operator_name: composable-operator
+channel_name: alpha
+maturity: alpha
+image: cloudoperators/composable-controller
+crd:
+    - kind: Composable
+      description: Overlay operator that allows its underlying object to be dynamically configurable
+      example: |-
+        {"apiVersion": "ibmcloud.ibm.com/v1alpha1",
+            "kind": "Composable",
+            "metadata": {
+              "name": "comp"
+            },
+            "spec": {
+              "template": { 
+                "apiVersion": "ibmcloud.ibm.com/v1alpha1",
+                "kind": "Service",
+                "metadata": {
+                  "name": "mytranslator"
+                },
+                "spec": {
+                  "serviceClass": "language-translator",
+                  "plan": {
+                    "getValueFrom": {
+                      "kind": "configmap",
+                      "name": "myconfigmap",
+                      "data": "{data.key}"
+                    }
+                  }
+                }
+              }
+            }
+          }
+      resources:
+        - kind: Secret
+          version: v1
+        - kind: ConfigMap
+          version: v1
+        - kind: Composable
+          version: v1alpha1
+      specDescriptors:        
+        - description: Template is the underlying object managed by the Composable
+          displayName: Template
+          path: template
+          x-descriptors:
+            - 'urn:alm:descriptor:text' 
+      statusDescriptors:
+        - description: Detailed message on current status
+          displayName: Message
+          path: message
+          x-descriptors:
+            - 'urn:alm:descriptor:text'    
+        - description: Current state for the composable
+          displayName: State
+          path: state
+          x-descriptors:
+            - 'urn:alm:descriptor:text'    
+
+  

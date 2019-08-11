@@ -15,22 +15,13 @@
 # limitations under the License.
 #
 
-set -e
 
-RELEASE="latest/"
+# Delete the CRDs first, so controllers clean up their resources
+# TODO - should label CRDs - see if it can be done with kubebuilder
+kubectl delete --wait crd composables.ibmcloud.ibm.com
 
-# check if running piped from curl
-if [ -z ${BASH_SOURCE} ]; then
-  echo "* Downloading install yaml..."
-  rm -rf /tmp/ibm-composable && mkdir -p /tmp/ibm-composable
-  cd /tmp/ibm-composable
-  curl -sLJO https://github.com/IBM/composable/archive/master.zip
-  unzip -qq composable-master.zip
-  cd composable-master
-  SCRIPTS_HOME=${PWD}/hack
-else
-  SCRIPTS_HOME=$(dirname ${BASH_SOURCE})
-fi
+# Delete all clusterwide resources for the operator
+kubectl delete clusterrole,clusterrolebinding -l app.kubernetes.io/name=composable-operator  
 
-# install the operator
-kubectl apply -f ${SCRIPTS_HOME}/../releases/${RELEASE}
+# delete all namespaced resources
+kubectl delete ns -l app.kubernetes.io/name=composable-operator

@@ -34,6 +34,11 @@ spec:
               type: object
           type: object
         status:
+          properties:
+            message:
+              type: string
+            state:
+              type: string
           type: object
   version: v1alpha1
 status:

@@ -1,0 +1,4 @@
+packageName: placeholder
+channels:
+  - name: placeholder
+    currentCSV: placeholder

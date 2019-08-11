@@ -3,7 +3,10 @@ kind: Deployment
 metadata:
   annotations:
     deployment.kubernetes.io/revision: "1"
+  labels:
+    app.kubernetes.io/name: composable-operator 
   name: composable-operator
+  namespace: composable-operator
 spec:
   replicas: 1
   selector:
@@ -22,7 +25,7 @@ spec:
       containers:
       - command:
         - ./manager
-        image: cloudoperators/composable-controller:0.1.0
+        image: PLACEHOLDER
         imagePullPolicy: Always
         name: composable
-      serviceAccountName: composable-service-account
+      serviceAccountName: composable-operator

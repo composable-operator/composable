@@ -2,14 +2,14 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   creationTimestamp: null
-  name: composable-rolebinding
+  name: composable-operator-rolebinding
   labels:
-    app.kubernetes.io/name: composable
+    app.kubernetes.io/name: composable-operator
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: composable-manager-role
+  name: composable-operator-manager-role
 subjects:
 - kind: ServiceAccount
-  name: composable-service-account
-  namespace: $NAMESPACE
+  name: composable-operator
+  namespace: composable-operator
