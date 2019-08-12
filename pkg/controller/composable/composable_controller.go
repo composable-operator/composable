@@ -503,40 +503,43 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 	found.SetAPIVersion(apiversion)
 	found.SetKind(kind)
 	err = r.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, found)
-	if err != nil && errors.IsNotFound(err) {
-		log.Println(err.Error())
-		log.Printf("Creating resource %s/%s\n", namespace, name)
-		err = r.Create(context.TODO(), &resource)
-		if err != nil {
-			log.Printf(err.Error())
-			if instance.Status.State != FailedStatus {
-				r.errorHandler(instance, err, FailedStatus, "Failed", "")
+	if err != nil  {
+		if errors.IsNotFound(err) {
+			log.Println(err.Error())
+			log.Printf("Creating resource %s/%s\n", namespace, name)
+			err = r.Create(context.TODO(), &resource)
+			if err != nil {
+				log.Printf(err.Error())
+				if instance.Status.State != FailedStatus {
+					r.errorHandler(instance, err, FailedStatus, "Failed", "")
+				}
+				return reconcile.Result{}, nil
 			}
-			return reconcile.Result{}, nil
-		}
 
-		// add watcher
-		err = r.controller.Watch(&source.Kind{Type: found}, &handler.EnqueueRequestForOwner{
-			IsController: true,
-			OwnerType:    &ibmcloudv1alpha1.Composable{},
-		})
-		if err != nil {
+			// add watcher
+			err = r.controller.Watch(&source.Kind{Type: found}, &handler.EnqueueRequestForOwner{
+				IsController: true,
+				OwnerType:    &ibmcloudv1alpha1.Composable{},
+			})
+			if err != nil {
+				r.errorHandler(instance, err, FailedStatus, "", "")
+				return reconcile.Result{}, nil
+			}
+		} else {
 			r.errorHandler(instance, err, FailedStatus, "", "")
 			return reconcile.Result{}, nil
 		}
-	} else if err != nil {
-		r.errorHandler(instance, err, FailedStatus, "", "")
-		return reconcile.Result{}, nil
-	}
-	// Update the found object and write the result back if there are any changes
-	if !reflect.DeepEqual(resource.Object[spec], found.Object[spec]) {
-		found.Object[spec] = resource.Object[spec]
-		log.Printf("Updating Resource %s/%s\n", namespace, name)
-		err = r.Update(context.TODO(), found)
-		if err != nil {
-			r.errorHandler(instance, err, FailedStatus, "", "")
-			log.Println("7")
-			return reconcile.Result{}, nil
+	} else {
+		// Update the found object and write the result back if there are any changes
+		if !reflect.DeepEqual(resource.Object[spec], found.Object[spec]) {
+			found.Object[spec] = resource.Object[spec]
+			log.Printf("Updating Resource %s/%s\n", namespace, name)
+			err = r.Update(context.TODO(), found)
+			if err != nil {
+				r.errorHandler(instance, err, FailedStatus, "", "")
+				log.Println("7")
+				return reconcile.Result{}, nil
+			}
 		}
 	}
 	instance.Status.State = OnlineStatus
