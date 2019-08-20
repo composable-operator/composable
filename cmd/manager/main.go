@@ -9,22 +9,21 @@ Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
-limitations under the License.
+limitations under the License.`
 */
 
 package main
 
 import (
 	"flag"
-	"log"
 	"os"
 
 	"github.com/IBM/composable/pkg/apis"
 	"github.com/IBM/composable/pkg/controller"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/oidc"
+	_ "k8s.io/client-go/plugin/pkg/client/auth" // Load all client auth plugins for GCP, Azure, Openstack, etc
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/signals"
 )
@@ -48,6 +47,7 @@ func BuildConfig(kubeconfig *string) (*rest.Config, error) {
 
 func main() {
 
+	klog.InitFlags(flag.CommandLine)
 	kubeconfig := flag.String("kubeconfig", "", "Path to a kube config. Only required if out-of-cluster.")
 	if flag.Lookup("kubeconfig") == nil {
 		flag.String("kubeconfig", os.Getenv("KUBECONFIG"), "Path to a kube config. Only required if out-of-cluster.")
@@ -56,7 +56,7 @@ func main() {
 	// build config for the  cluster
 	cfg, err := BuildConfig(kubeconfig)
 	if err != nil {
-		log.Fatal(err)
+		klog.Fatalf("BuildConfig returned error: %q", err.Error())
 	}
 
 	// Get a config to talk to the apiserver
@@ -68,23 +68,23 @@ func main() {
 	// Create a new Cmd to provide shared dependencies and start components
 	mgr, err := manager.New(cfg, manager.Options{})
 	if err != nil {
-		log.Fatal(err)
+		klog.Fatalf("manager.New returned error: %q", err.Error())
 	}
 
-	log.Printf("Registering Components.")
+	klog.V(3).Infoln("Registering Components.")
 
 	// Setup Scheme for all resources
 	if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
-		log.Fatal(err)
+		klog.Fatalf("apis.AddToScheme returned error: %q", err.Error())
 	}
 
 	// Setup all Controllers
 	if err := controller.AddToManager(mgr); err != nil {
-		log.Fatal(err)
+		klog.Fatalf("controller.AddToManager returned error: %q", err.Error())
 	}
 
-	log.Printf("Starting the Cmd.")
+	klog.V(3).Infoln("Starting the Cmd.")
 
 	// Start the Cmd
-	log.Fatal(mgr.Start(signals.SetupSignalHandler()))
+	klog.Error(mgr.Start(signals.SetupSignalHandler()))
 }

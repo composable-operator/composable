@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"reflect"
 	"strings"
 	"time"
@@ -35,6 +34,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/third_party/forked/golang/template"
 	"k8s.io/client-go/util/jsonpath"
+	"k8s.io/klog"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -133,7 +133,7 @@ func toJSONFromRaw(content *runtime.RawExtension) (interface{}, error) {
 	return data, nil
 }
 
-func (r *ReconcileComposable)resolve(object interface{}, composableNamespace string) (unstructured.Unstructured, error) {
+func (r *ReconcileComposable) resolve(object interface{}, composableNamespace string) (unstructured.Unstructured, error) {
 	// Set namespace if undefined
 	objMap := object.(map[string]interface{})
 	if _, ok := objMap[metadata]; !ok {
@@ -155,7 +155,7 @@ func (r *ReconcileComposable)resolve(object interface{}, composableNamespace str
 	return ret, nil
 }
 
-func (r *ReconcileComposable)resolveFields(fields interface{}, composableNamespace string, resources *[]*metav1.APIResourceList) (interface{}, error) {
+func (r *ReconcileComposable) resolveFields(fields interface{}, composableNamespace string, resources *[]*metav1.APIResourceList) (interface{}, error) {
 
 	switch fields.(type) {
 	case map[string]interface{}:
@@ -257,7 +257,7 @@ func GroupQualifiedName(apiResource metav1.APIResource) string {
 	return fmt.Sprintf("%s.%s", apiResource.Name, apiResource.Group)
 }
 
-func (r *ReconcileComposable)LookupAPIResource(key, targetVersion string, resources *[]*metav1.APIResourceList) (*metav1.APIResource, error) {
+func (r *ReconcileComposable) LookupAPIResource(key, targetVersion string, resources *[]*metav1.APIResourceList) (*metav1.APIResource, error) {
 	if resources == nil {
 		resourceList, err := GetServerPreferredResources(r.config)
 		if err != nil {
@@ -301,11 +301,12 @@ func (r *ReconcileComposable)LookupAPIResource(key, targetVersion string, resour
 	return nil, fmt.Errorf("Unable to find api resource named %q.", key)
 }
 
-func (r *ReconcileComposable)resolveValue(value interface{}, composableNamespace string, resources *[]*metav1.APIResourceList) (interface{}, error) {
+func (r *ReconcileComposable) resolveValue(value interface{}, composableNamespace string, resources *[]*metav1.APIResourceList) (interface{}, error) {
 	if val, ok := value.(map[string]interface{}); ok {
 		if kind, ok := val[kind].(string); ok {
 			vers := ""
-			if vers, ok = val[version].(string); ok {}
+			if vers, ok = val[version].(string); ok {
+			}
 			res, err := r.LookupAPIResource(kind, vers, resources)
 			if err != nil {
 				return errorToDefaultValue(val, err)
@@ -340,7 +341,7 @@ func (r *ReconcileComposable)resolveValue(value interface{}, composableNamespace
 						path = path[:1] + objectPrefix + path[1:]
 						err = j.Parse(path)
 						if err != nil {
-							log.Fatalf("jsonpath 1.5 %v", err)
+							klog.Errorf("jsonpath is %s, error is %s", path, err.Error())
 							return nil, err
 						}
 						j.AllowMissingKeys(false)
@@ -371,7 +372,7 @@ func (r *ReconcileComposable)resolveValue(value interface{}, composableNamespace
 						} else {
 							retVal = iface
 						}
-						log.Printf("resolveValue returned %v [%T]\n", retVal, retVal)
+						klog.V(5).Infof("resolveValue returned %v [%T]\n", retVal, retVal)
 						return retVal, nil
 					}
 					return nil, fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is not jsonpath formated")
@@ -389,7 +390,7 @@ func (r *ReconcileComposable)resolveValue(value interface{}, composableNamespace
 
 func errorToDefaultValue(val map[string]interface{}, err error) (interface{}, error) {
 	if defaultValue, ok := val[defaultValue]; ok {
-		log.Printf("Return default value %v\n", defaultValue)
+		klog.V(5).Infof("Return default value %v\n", defaultValue)
 		return defaultValue, nil
 	}
 	return nil, err
@@ -469,7 +470,7 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 
 	}
 
-	log.Println("Resource name is: " + name)
+	klog.V(5).Info("Resource name is: " + name)
 
 	namespace, err := getNamespace(resource.Object)
 	if err != nil {
@@ -477,7 +478,7 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, nil
 	}
 
-	log.Println("Resource namespace is: " + namespace)
+	klog.V(5).Info("Resource namespace is: " + namespace)
 
 	apiversion, ok := resource.Object["apiVersion"].(string)
 	if !ok {
@@ -485,7 +486,7 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, nil
 	}
 
-	log.Println("Resource apiversion is: " + apiversion)
+	klog.V(5).Info("Resource apiversion is: " + apiversion)
 
 	kind, ok := resource.Object["kind"].(string)
 	if !ok {
@@ -493,7 +494,7 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 		return reconcile.Result{}, nil
 	}
 
-	log.Println("Resource kind is: " + kind)
+	klog.V(5).Info("Resource kind is: " + kind)
 
 	if err := controllerutil.SetControllerReference(instance, &resource, r.scheme); err != nil {
 		r.errorHandler(instance, err, PendingStatus, "", "")
@@ -503,13 +504,12 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 	found.SetAPIVersion(apiversion)
 	found.SetKind(kind)
 	err = r.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, found)
-	if err != nil  {
+	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Println(err.Error())
-			log.Printf("Creating resource %s/%s\n", namespace, name)
+			klog.V(5).Infof("Creating resource %s/%s\n", namespace, name)
 			err = r.Create(context.TODO(), &resource)
 			if err != nil {
-				log.Printf(err.Error())
+				klog.Errorf("Creation of resource %s/%s returned error: %s\n", namespace, name, err.Error())
 				if instance.Status.State != FailedStatus {
 					r.errorHandler(instance, err, FailedStatus, "Failed", "")
 				}
@@ -533,11 +533,10 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 		// Update the found object and write the result back if there are any changes
 		if !reflect.DeepEqual(resource.Object[spec], found.Object[spec]) {
 			found.Object[spec] = resource.Object[spec]
-			log.Printf("Updating Resource %s/%s\n", namespace, name)
+			klog.V(5).Infof("Updating Resource %s/%s\n", namespace, name)
 			err = r.Update(context.TODO(), found)
 			if err != nil {
 				r.errorHandler(instance, err, FailedStatus, "", "")
-				log.Println("7")
 				return reconcile.Result{}, nil
 			}
 		}
@@ -556,7 +555,7 @@ func (r *ReconcileComposable) errorHandler(instance *ibmcloudv1alpha1.Composable
 	if err == nil {
 		return
 	}
-	log.Printf("%s %s\n", errMsg, err.Error())
+	klog.Errorf("error: %v, message %s", err, errMsg)
 	instance.Status.State = status
 	if statusMsg != "" {
 		instance.Status.Message = statusMsg
@@ -565,6 +564,6 @@ func (r *ReconcileComposable) errorHandler(instance *ibmcloudv1alpha1.Composable
 	}
 	er := r.Update(context.TODO(), instance)
 	if er != nil {
-		log.Printf("Embedded error: %v\n", er)
+		klog.Errorf("Embedded error of updating %s %s/%s, error is %s \n", instance.Kind, instance.Name, instance.Namespace, err.Error())
 	}
 }

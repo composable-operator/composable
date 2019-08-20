@@ -10,6 +10,21 @@
   version = "v0.38.0"
 
 [[projects]]
+  digest = "1:2ada81cd8200c92042eacad1f61934013c8a72e4884494b7c6efada9c5e44db6"
+  name = "github.com/Azure/go-autorest"
+  packages = [
+    "autorest",
+    "autorest/adal",
+    "autorest/azure",
+    "autorest/date",
+    "logger",
+    "tracing",
+  ]
+  pruneopts = "T"
+  revision = "5e7a399d8bbf4953ab0c8e3167d7fd535fd74ce1"
+  version = "v13.0.0"
+
+[[projects]]
   digest = "1:464aef731a5f82ded547c62e249a2e9ec59fbbc9ddab53cda7b9857852630a61"
   name = "github.com/appscode/jsonpatch"
   packages = ["."]
@@ -32,6 +47,14 @@
   pruneopts = "T"
   revision = "8991bc29aa16c548c550c7ff78260e27b9ab7c73"
   version = "v1.1.1"
+
+[[projects]]
+  digest = "1:6b014c67cb522566c30ef02116f9acb50cd60954708cf92c6654e2985696db18"
+  name = "github.com/dgrijalva/jwt-go"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "06ea1031745cb8b3dab3f6a236daf2b0aa468b7e"
+  version = "v3.2.0"
 
 [[projects]]
   digest = "1:862ab07080c694418bfb31b051269a76a8bc19c2f2b9fc19b84cd601445285b4"
@@ -144,6 +167,22 @@
   pruneopts = "T"
   revision = "7c663266750e7d82587642f65e60bc4083f1f84e"
   version = "v0.2.0"
+
+[[projects]]
+  digest = "1:d714603abff24756ae465b1128bd1d1c963325f7e76ba3f95c321e1cb8dbacf0"
+  name = "github.com/gophercloud/gophercloud"
+  packages = [
+    ".",
+    "openstack",
+    "openstack/identity/v2/tenants",
+    "openstack/identity/v2/tokens",
+    "openstack/identity/v3/tokens",
+    "openstack/utils",
+    "pagination",
+  ]
+  pruneopts = "T"
+  revision = "0398b0cd16bfffade0883973c745180adbbe8918"
+  version = "v0.3.0"
 
 [[projects]]
   branch = "master"
@@ -760,9 +799,12 @@
     "pkg/apis/clientauthentication/v1alpha1",
     "pkg/apis/clientauthentication/v1beta1",
     "pkg/version",
+    "plugin/pkg/client/auth",
+    "plugin/pkg/client/auth/azure",
     "plugin/pkg/client/auth/exec",
     "plugin/pkg/client/auth/gcp",
     "plugin/pkg/client/auth/oidc",
+    "plugin/pkg/client/auth/openstack",
     "rest",
     "rest/watch",
     "restmapper",
@@ -940,13 +982,14 @@
     "k8s.io/apimachinery/pkg/types",
     "k8s.io/client-go/discovery",
     "k8s.io/client-go/kubernetes/scheme",
+    "k8s.io/client-go/plugin/pkg/client/auth",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp",
-    "k8s.io/client-go/plugin/pkg/client/auth/oidc",
     "k8s.io/client-go/rest",
     "k8s.io/client-go/third_party/forked/golang/template",
     "k8s.io/client-go/tools/clientcmd",
     "k8s.io/client-go/util/jsonpath",
     "k8s.io/code-generator/cmd/deepcopy-gen",
+    "k8s.io/klog",
     "sigs.k8s.io/controller-runtime/pkg/client",
     "sigs.k8s.io/controller-runtime/pkg/client/config",
     "sigs.k8s.io/controller-runtime/pkg/controller",
