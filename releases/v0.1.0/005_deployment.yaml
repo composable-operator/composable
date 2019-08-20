@@ -24,8 +24,8 @@ spec:
     spec:
       containers:
       - args:
-        - "-logtostderr=true"
-        - "-v=5"
+        - -logtostderr=true
+        - -v=5
         command:
         - ./manager
         image: cloudoperators/composable-controller:0.1.0
