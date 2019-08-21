@@ -70,6 +70,11 @@ type ReconcileComposable struct {
 	controller controller.Controller
 }
 
+type composableCache struct {
+	objects map[string]interface{}
+	resources []*metav1.APIResourceList
+}
+
 type reconcilerWithController interface {
 	reconcile.Reconciler
 	GetController() controller.Controller
@@ -147,7 +152,8 @@ func (r *ReconcileComposable) resolve(object interface{}, composableNamespace st
 		return unstructured.Unstructured{}, fmt.Errorf("Failed: Template has an ill-defined metadata section")
 	}
 
-	obj, err := r.resolveFields(object.(map[string]interface{}), composableNamespace, nil)
+	cache := &composableCache{objects: make(map[string]interface{})}
+	obj, err := r.resolveFields(object.(map[string]interface{}), composableNamespace, cache)
 	if err != nil {
 		return unstructured.Unstructured{}, err
 	}
@@ -155,8 +161,7 @@ func (r *ReconcileComposable) resolve(object interface{}, composableNamespace st
 	return ret, nil
 }
 
-func (r *ReconcileComposable) resolveFields(fields interface{}, composableNamespace string, resources *[]*metav1.APIResourceList) (interface{}, error) {
-
+func (r *ReconcileComposable) resolveFields(fields interface{}, composableNamespace string, cache *composableCache) (interface{}, error) {
 	switch fields.(type) {
 	case map[string]interface{}:
 		if fieldsOut, ok := fields.(map[string]interface{}); ok {
@@ -164,7 +169,7 @@ func (r *ReconcileComposable) resolveFields(fields interface{}, composableNamesp
 				var newFields interface{}
 				var err error
 				if k == getValueFrom {
-					newFields, err = r.resolveValue(v, composableNamespace, resources)
+					newFields, err = r.resolveValue(v, composableNamespace, cache)
 					if err != nil {
 						return nil, err
 					}
@@ -172,11 +177,11 @@ func (r *ReconcileComposable) resolveFields(fields interface{}, composableNamesp
 				} else if values, ok := v.(map[string]interface{}); ok {
 					if value, ok := values[getValueFrom]; ok {
 						if len(values) > 1 {
-							return nil, fmt.Errorf("Failed: Template is ill-formed. GetValueFrom must be the only field in a value")
+							return nil, fmt.Errorf("Failed: Template is ill-formed. GetValueFrom must be the only field in a value.")
 						}
-						newFields, err = r.resolveValue(value, composableNamespace, resources)
+						newFields, err = r.resolveValue(value, composableNamespace, cache)
 					} else {
-						newFields, err = r.resolveFields(values, composableNamespace, resources)
+						newFields, err = r.resolveFields(values, composableNamespace, cache)
 					}
 					if err != nil {
 						return nil, err
@@ -184,7 +189,7 @@ func (r *ReconcileComposable) resolveFields(fields interface{}, composableNamesp
 					fieldsOut[k] = newFields
 				} else if values, ok := v.([]interface{}); ok {
 					for i, value := range values {
-						newFields, err := r.resolveFields(value, composableNamespace, resources)
+						newFields, err := r.resolveFields(value, composableNamespace, cache)
 						if err != nil {
 							return nil, err
 						}
@@ -197,7 +202,7 @@ func (r *ReconcileComposable) resolveFields(fields interface{}, composableNamesp
 	case []map[string]interface{}, [][]interface{}:
 		if values, ok := fields.([]interface{}); ok {
 			for i, value := range values {
-				newFields, err := r.resolveFields(value, composableNamespace, resources)
+				newFields, err := r.resolveFields(value, composableNamespace, cache)
 				if err != nil {
 					return nil, err
 				}
@@ -218,6 +223,7 @@ func GetServerPreferredResources(config *rest.Config) ([]*metav1.APIResourceList
 	}
 
 	resourceLists, err := client.ServerPreferredResources()
+	client.ServerResources()
 	if err != nil {
 		return nil, fmt.Errorf("Error listing api resources, %v", err)
 	}
@@ -257,18 +263,20 @@ func GroupQualifiedName(apiResource metav1.APIResource) string {
 	return fmt.Sprintf("%s.%s", apiResource.Name, apiResource.Group)
 }
 
-func (r *ReconcileComposable) LookupAPIResource(key, targetVersion string, resources *[]*metav1.APIResourceList) (*metav1.APIResource, error) {
-	if resources == nil {
+func (r *ReconcileComposable) LookupAPIResource(key, targetVersion string, cache *composableCache) (*metav1.APIResource, error) {
+	if cache.resources == nil {
+		klog.V(6).Infoln("Resources is nil")
 		resourceList, err := GetServerPreferredResources(r.config)
 		if err != nil {
 			return nil, err
 		}
-		resources = &resourceList
+		cache.resources = resourceList
 	}
+	resources := cache.resources
 
 	var targetResource *metav1.APIResource
 	var matchedResources []string
-	for _, resourceList := range *resources {
+	for _, resourceList := range resources {
 		// The list holds the GroupVersion for its list of APIResources
 		gv, err := schema.ParseGroupVersion(resourceList.GroupVersion)
 		if err != nil {
@@ -301,13 +309,14 @@ func (r *ReconcileComposable) LookupAPIResource(key, targetVersion string, resou
 	return nil, fmt.Errorf("Unable to find api resource named %q.", key)
 }
 
-func (r *ReconcileComposable) resolveValue(value interface{}, composableNamespace string, resources *[]*metav1.APIResourceList) (interface{}, error) {
+func (r *ReconcileComposable) resolveValue(value interface{}, composableNamespace string, cache *composableCache) (interface{}, error) {
 	if val, ok := value.(map[string]interface{}); ok {
 		if kind, ok := val[kind].(string); ok {
 			vers := ""
 			if vers, ok = val[version].(string); ok {
+				// TODO fix
 			}
-			res, err := r.LookupAPIResource(kind, vers, resources)
+			res, err := r.LookupAPIResource(kind, vers, cache)
 			if err != nil {
 				return errorToDefaultValue(val, err)
 			}
@@ -324,17 +333,23 @@ func (r *ReconcileComposable) resolveValue(value interface{}, composableNamespac
 						} else {
 							objNamespacedname = types.NamespacedName{Name: name}
 						}
-
 						groupVersionKind := schema.GroupVersionKind{Kind: res.Kind, Version: res.Version, Group: res.Group}
-						unstrObj := unstructured.Unstructured{}
-						unstrObj.SetAPIVersion(res.Version)
-						unstrObj.SetGroupVersionKind(groupVersionKind)
-						err = r.Get(context.TODO(), objNamespacedname, &unstrObj)
-						if err != nil {
-							if errors.IsNotFound(err) {
-								return errorToDefaultValue(val, err)
+						var unstrObj unstructured.Unstructured
+						if obj, ok := cache.objects[objectKey(objNamespacedname, groupVersionKind)]; ok {
+							unstrObj = obj.(unstructured.Unstructured)
+						} else {
+							unstrObj = unstructured.Unstructured{}
+							unstrObj.SetAPIVersion(res.Version)
+							unstrObj.SetGroupVersionKind(groupVersionKind)
+							klog.V(5).Infof("Get Object %s\n", objNamespacedname)
+							err = r.Get(context.TODO(), objNamespacedname, &unstrObj)
+							if err != nil {
+								if errors.IsNotFound(err) {
+									return errorToDefaultValue(val, err)
+								}
+								return nil, err
 							}
-							return nil, err
+							cache.objects[objectKey(objNamespacedname, groupVersionKind)] = unstrObj
 						}
 						j := jsonpath.New("compose")
 						// add ".Object" to the path
@@ -424,6 +439,7 @@ func (r *ReconcileComposable) GetController() controller.Controller {
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=ibmcloud.ibm.com,resources=composables,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	klog.V(5).Infoln("Start Reconcile loop")
 	// Fetch the Composable instance
 	instance := &ibmcloudv1alpha1.Composable{}
 	err := r.Get(context.TODO(), request.NamespacedName, instance)
@@ -436,7 +452,7 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 		// Error reading the object - requeue the request.
 		return reconcile.Result{}, err
 	}
-
+	klog.V(5).Infof("Reconcile loop for %s/%s", instance.Namespace, instance.Name)
 	if reflect.DeepEqual(instance.Status, ibmcloudv1alpha1.ComposableStatus{}) {
 		instance.Status = ibmcloudv1alpha1.ComposableStatus{State: PendingStatus, Message: "Creating resource"}
 		if err := r.Update(context.Background(), instance); err != nil {
@@ -444,6 +460,7 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 		}
 	}
 	if instance.Spec.Template == nil {
+		klog.V(5).Infof("The object's %s/%s spec doesn't contain `Template`", instance.Namespace, instance.Name)
 		// The object's spec doesn't contain `Template`
 		return reconcile.Result{}, nil
 	}
@@ -566,4 +583,8 @@ func (r *ReconcileComposable) errorHandler(instance *ibmcloudv1alpha1.Composable
 	if er != nil {
 		klog.Errorf("Embedded error of updating %s %s/%s, error is %s \n", instance.Kind, instance.Name, instance.Namespace, err.Error())
 	}
+}
+
+func objectKey(nn types.NamespacedName, gvk schema.GroupVersionKind) string {
+	return fmt.Sprintf("%s/%s", nn.String(), gvk.String());
 }
