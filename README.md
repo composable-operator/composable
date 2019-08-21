@@ -21,15 +21,22 @@ Composable is an overlay operator that can wrap any resource (native Kubernetes 
 
 The Composable Operator enables the complete declarative executable specification of collections of inter-dependent resources.
 
-## Installation
+## Installation Composable
 
-To install the Composable operator, do the following:
-```shell
-git clone git@github.com:IBM/composable.git
-./composable/hack/install-composable.sh [namespace]
+To install the latest release of Composable, run the following script:
+
+```bash
+curl -sL https://raw.githubusercontent.com/IBM/composable/master/hack/install-composable.sh | bash 
 ```
-An optional [namespace] argument specifies the namespace in which the controller pod will run. If a namespace is not provided, the controller pod will run in the `default` namespace.
+Composable will be installed in the `composable-operator` namespace
 
+## Removing Composable
+
+To remove Composable, run the following script:
+
+```bash
+curl -sL https://raw.githubusercontent.com/IBM/composable/master/hack/uninstall-composable.sh | bash 
+```
 ## Examples
 
 ```yaml
