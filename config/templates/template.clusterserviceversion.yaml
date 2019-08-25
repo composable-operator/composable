@@ -57,7 +57,7 @@ spec:
       name: PLACEHOLDER
   links:
   - name: Composable Operator
-    url: https://github.com/ibm/composable
+    url: https://github.com/IBM/composable
   installModes:
   - type: OwnNamespace
     supported: true
