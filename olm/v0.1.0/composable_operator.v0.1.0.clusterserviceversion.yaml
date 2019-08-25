@@ -118,7 +118,7 @@ spec:
     name: composable-operator
   links:
   - name: Composable Operator
-    url: https://github.com/ibm/composable
+    url: https://github.com/IBM/composable
   maintainers:
   - email: dettori@us.ibm.com
     name: Paolo Dettori
