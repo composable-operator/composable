@@ -4,7 +4,7 @@ go:
 dist: xenial
 services:
 - docker
-go_import_path: github.com/IBM/composable
+go_import_path: github.com/ibm/composable
 before_script:
 - make deps
 before_install:
