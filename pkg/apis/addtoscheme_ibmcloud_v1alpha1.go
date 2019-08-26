@@ -15,7 +15,7 @@ limitations under the License.
 package apis
 
 import (
-	"github.com/IBM/composable/pkg/apis/ibmcloud/v1alpha1"
+	"github.com/ibm/composable/pkg/apis/ibmcloud/v1alpha1"
 )
 
 func init() {
