@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	ibmcloudv1alpha1 "github.com/IBM/composable/pkg/apis/ibmcloud/v1alpha1"
+	ibmcloudv1alpha1 "github.com/ibm/composable/pkg/apis/ibmcloud/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,7 +71,7 @@ type ReconcileComposable struct {
 }
 
 type composableCache struct {
-	objects map[string]interface{}
+	objects   map[string]interface{}
 	resources []*metav1.APIResourceList
 }
 
@@ -586,5 +586,5 @@ func (r *ReconcileComposable) errorHandler(instance *ibmcloudv1alpha1.Composable
 }
 
 func objectKey(nn types.NamespacedName, gvk schema.GroupVersionKind) string {
-	return fmt.Sprintf("%s/%s", nn.String(), gvk.String());
+	return fmt.Sprintf("%s/%s", nn.String(), gvk.String())
 }

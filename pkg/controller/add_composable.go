@@ -15,7 +15,7 @@ limitations under the License.
 package controller
 
 import (
-	"github.com/IBM/composable/pkg/controller/composable"
+	"github.com/ibm/composable/pkg/controller/composable"
 )
 
 func init() {

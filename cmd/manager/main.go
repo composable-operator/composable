@@ -18,8 +18,8 @@ import (
 	"flag"
 	"os"
 
-	"github.com/IBM/composable/pkg/apis"
-	"github.com/IBM/composable/pkg/controller"
+	"github.com/ibm/composable/pkg/apis"
+	"github.com/ibm/composable/pkg/controller"
 	_ "k8s.io/client-go/plugin/pkg/client/auth" // Load all client auth plugins for GCP, Azure, Openstack, etc
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
