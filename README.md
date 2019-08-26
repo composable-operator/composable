@@ -166,7 +166,7 @@ do it. Here are the data transformation roles:
 * If there is no data transformers  -  original data format will be used, include complex structures such as maps or arrays.
 * Transformers from the data-transformers array executed one after another according to their order. Which allows 
 creation of data transformation pipelines. For example, the following snippet defines a data transformation from a base64 
-encoded string to a plain string and after that to integer. This transformation can be useful to retrieve data from Secretes.
+encoded string to a plain string and after that to integer. This transformation can be useful to retrieve data from Secrets.
  
 ```yaml
 format-transformers:
