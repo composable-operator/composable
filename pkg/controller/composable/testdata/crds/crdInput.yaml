@@ -1,0 +1,55 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  # name must match the spec fields below, and be in the form: <plural>.<group>
+  name: inputvalues.test.ibmcloud.ibm.com
+spec:
+  # group name to use for REST API: /apis/<group>/<version>
+  group: test.ibmcloud.ibm.com
+  # list of versions supported by this CustomResourceDefinition
+  version: v1
+  # either Namespaced or Cluster
+  scope: Namespaced
+  names:
+    # plural name to be used in the URL: /apis/<group>/<version>/<plural>
+    plural: inputvalues
+    # singular name to be used as an alias on the CLI and for display
+    singular: inputvalue
+    # kind is normally the CamelCased singular type. Your resource manifests use this.
+    kind: InputValue
+    # shortNames allow shorter string to match your resource on the CLI
+    shortNames:
+    - inval
+  # preserveUnknownFields: false
+  validation:
+    openAPIV3Schema:
+      type: object
+      properties:
+        spec:
+          type: object
+          properties:
+            intValue:
+              type: integer
+            floatValue:
+              type: number
+            boolValue:
+              type: boolean
+            stringValue:
+              type: string
+            jsonValue:
+              type: string
+            base64Value:
+              type: string
+            arrayStrings:
+              type: array
+              items:
+                type: string
+            arrayIntegers:
+              type: array
+              items:
+                type: integer
+            objectValue:
+              type: object
+
+
+

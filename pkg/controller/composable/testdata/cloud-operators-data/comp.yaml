@@ -10,12 +10,7 @@ spec:
     kind: Service
     metadata:
       name: mymessagehub
+      namespace: default
     spec:
+      plan: standard
       serviceClass: messagehub
-      plan:
-        getValueFrom:
-          kind: Secret
-          name: mysecret
-          path: '{.data.plan}'
-          format-transformers:
-          - "Base64ToString"
