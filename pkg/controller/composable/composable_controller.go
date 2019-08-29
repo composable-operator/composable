@@ -59,9 +59,9 @@ const (
 	transformers   = "format-transformers"
 	controllerName = "Compasable-controller"
 
-	FailedStatus   = "Failed"
-	PendingStatus  = "Pending"
-	OnlineStatus   = "Online"
+	FailedStatus  = "Failed"
+	PendingStatus = "Pending"
+	OnlineStatus  = "Online"
 )
 
 // ReconcileComposable reconciles a Composable object
@@ -80,7 +80,7 @@ type composableCache struct {
 type reconcilerWithController interface {
 	reconcile.Reconciler
 	getController() controller.Controller
-	setController( controller  controller.Controller)
+	setController(controller controller.Controller)
 }
 
 var _ reconcilerWithController = &ReconcileComposable{}
@@ -93,12 +93,12 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcilerWithController {
-	return  &ReconcileComposable{Client: mgr.GetClient(), scheme: mgr.GetScheme(), config: mgr.GetConfig()}
+	return &ReconcileComposable{Client: mgr.GetClient(), scheme: mgr.GetScheme(), config: mgr.GetConfig()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcilerWithController) error {
-	c, err := controller.New(controllerName , mgr, controller.Options{Reconciler: r})
+	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
@@ -290,7 +290,7 @@ func (r *ReconcileComposable) LookupAPIResource(key, targetVersion string, cache
 	return nil, fmt.Errorf("Unable to find api resource named %q.", key)
 }
 
-	func (r *ReconcileComposable) resolveValue(value interface{}, composableNamespace string, cache *composableCache) (interface{}, error) {
+func (r *ReconcileComposable) resolveValue(value interface{}, composableNamespace string, cache *composableCache) (interface{}, error) {
 	if val, ok := value.(map[string]interface{}); ok {
 		if kind, ok := val[kind].(string); ok {
 			vers := ""
@@ -422,7 +422,7 @@ func (r *ReconcileComposable) getController() controller.Controller {
 	return r.controller
 }
 
-func (r *ReconcileComposable) setController(controller controller.Controller)  {
+func (r *ReconcileComposable) setController(controller controller.Controller) {
 	r.controller = controller
 }
 
