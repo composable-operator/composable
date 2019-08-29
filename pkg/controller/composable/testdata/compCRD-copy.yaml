@@ -1,0 +1,20 @@
+apiVersion: ibmcloud.ibm.com/v1alpha1
+kind: Composable
+metadata:
+  name: copy-values
+spec:
+  template: 
+    apiVersion: "stable.example.com/v1"
+    kind: OutputValue
+    metadata:
+      name: comp-out
+    spec:
+      instancename: compOut
+      intValue:
+        getValueFrom:
+          kind: InputValue
+          name: inputdata
+          namespace: test-namespace
+          path: '{.spec.intValue}'
+
+

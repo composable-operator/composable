@@ -15,8 +15,10 @@ limitations under the License.
 package composable
 
 import (
-	"reflect"
-	"testing"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	. "github.com/onsi/ginkgo/extensions/table"
 )
 
 type Planet struct {
@@ -24,76 +26,44 @@ type Planet struct {
 	YearSpan int
 }
 
-func TestArray2CSStringTransformer(t *testing.T) {
-
-	var tests = []struct {
-		value interface{}
-		exp   string
-	}{
-		{[]string{"a", "b", "cd", "efg"}, "a,b,cd,efg"},
-		{[]int32{1, 2, 34, 567}, "1,2,34,567"},
-		{[]int64{1, 2, 34, 567}, "1,2,34,567"},
-		{[]float32{1.1, 2.2, 34.3, 567.0, 1.234560e+02}, "1.1,2.2,34.3,567,123.456"},
-		{[]float64{1.1, 2.2, 34.3, 567.0, 1.234560e+02}, "1.1,2.2,34.3,567,123.456"},
-		{[]bool{true, false, true}, "true,false,true"},
-		{[]Planet{{Name: "Mercury", YearSpan: 88}, {Name: "Venus", YearSpan: 243}, {Name: "Earth", YearSpan: 365}},
-			"{Mercury 88},{Venus 243},{Earth 365}"},
-		{"test", "test"},
-		{12, "12"},
-		{true, "true"},
-	}
-
-	for _, e := range tests {
-		t.Logf("inputValue = %v\n", e.value)
-		retValue, err := Array2CSStringTransformer(e.value)
-		if err != nil {
-			t.Fatalf("An unexpected error occurred: %v", err)
-		}
-		t.Logf("retValue = %v\n", retValue)
-		if strRetValue, ok := retValue.(string); ok {
-			if strRetValue == e.exp {
-				continue
-			}
-			t.Fatalf("retruned str %q is not equal to expected string %q", strRetValue, e.exp)
-		}
-		t.Fatalf("retruned value is not string [%T]", retValue)
-	}
-}
-
-func TestCompoundTransformerNames(t *testing.T) {
-	var tests = []struct {
-		value            interface{}
-		transformerNames []string
-		exp              interface{}
-	}{
-		{12, []string{ToString, StringToInt}, 12},
-		{"12", []string{StringToInt, ToString}, "12"},
-		{12.2, []string{ToString, StringToFloat}, 12.2},
-		{"12.2", []string{StringToFloat, ToString}, "12.2"},
-		{true, []string{ToString, StringToBool}, true},
-		{"true", []string{StringToBool, ToString}, "true"},
-		{13, []string{ToString, StringToBase64, Base64ToString, StringToInt}, 13},
-		{true, []string{ToString, StringToBase64, Base64ToString, StringToBool}, true},
-		{"[\"kafka04-prod02.messagehub.services.us-south.bluemix.net:9093\",\"kafka03-prod02.messagehub.services.us-south.bluemix.net:9093\",\"kafka05-prod02.messagehub.services.us-south.bluemix.net:9093\",\"kafka02-prod02.messagehub.services.us-south.bluemix.net:9093\",\"kafka01-prod02.messagehub.services.us-south.bluemix.net:9093\"]",
+var _ = Describe("./pkg/controller/composable/trnsformers", func() {
+	DescribeTable("Test CompoundTransformerNames",
+		func(inputVal interface{}, transformerNames []string, expectedVal interface{}) {
+			Ω(CompoundTransformerNames(inputVal, transformerNames...)).Should(Equal(expectedVal))
+		},
+		Entry("ToString, StringToInt", 12, []string{ToString, StringToInt}, 12),
+		Entry("StringToInt, ToString","12", []string{StringToInt, ToString}, "12"),
+		Entry("ToString, StringToFloat", 12.2, []string{ToString, StringToFloat}, 12.2),
+		Entry("StringToFloat, ToString", "12.2", []string{StringToFloat, ToString}, "12.2") ,
+		Entry("StringToFloat, ToString", true, []string{ToString, StringToBool}, true),
+		Entry("StringToBool, ToString","true", []string{StringToBool, ToString}, "true"),
+		Entry("ToString, StringToBase64, Base64ToString, StringToInt", 13, []string{ToString, StringToBase64, Base64ToString, StringToInt}, 13),
+		Entry("ToString, StringToBase64, Base64ToString, StringToBool",true, []string{ToString, StringToBase64, Base64ToString, StringToBool}, true),
+		Entry("JsonToObject, ArrayToCSString","[\"kafka04-prod02.messagehub.services.us-south.bluemix.net:9093\",\"kafka03-prod02.messagehub.services.us-south.bluemix.net:9093\",\"kafka05-prod02.messagehub.services.us-south.bluemix.net:9093\",\"kafka02-prod02.messagehub.services.us-south.bluemix.net:9093\",\"kafka01-prod02.messagehub.services.us-south.bluemix.net:9093\"]",
 			[]string{JsonToObject, ArrayToCSString},
-			"kafka04-prod02.messagehub.services.us-south.bluemix.net:9093,kafka03-prod02.messagehub.services.us-south.bluemix.net:9093,kafka05-prod02.messagehub.services.us-south.bluemix.net:9093,kafka02-prod02.messagehub.services.us-south.bluemix.net:9093,kafka01-prod02.messagehub.services.us-south.bluemix.net:9093"},
-		{"WyJrYWZrYTA0LXByb2QwMi5tZXNzYWdlaHViLnNlcnZpY2VzLnVzLXNvdXRoLmJsdWVtaXgubmV0OjkwOTMiLCJrYWZrYTAzLXByb2QwMi5tZXNzYWdlaHViLnNlcnZpY2VzLnVzLXNvdXRoLmJsdWVtaXgubmV0OjkwOTMiLCJrYWZrYTA1LXByb2QwMi5tZXNzYWdlaHViLnNlcnZpY2VzLnVzLXNvdXRoLmJsdWVtaXgubmV0OjkwOTMiLCJrYWZrYTAyLXByb2QwMi5tZXNzYWdlaHViLnNlcnZpY2VzLnVzLXNvdXRoLmJsdWVtaXgubmV0OjkwOTMiLCJrYWZrYTAxLXByb2QwMi5tZXNzYWdlaHViLnNlcnZpY2VzLnVzLXNvdXRoLmJsdWVtaXgubmV0OjkwOTMiXQo=",
+			"kafka04-prod02.messagehub.services.us-south.bluemix.net:9093,kafka03-prod02.messagehub.services.us-south.bluemix.net:9093,kafka05-prod02.messagehub.services.us-south.bluemix.net:9093,kafka02-prod02.messagehub.services.us-south.bluemix.net:9093,kafka01-prod02.messagehub.services.us-south.bluemix.net:9093"),
+		Entry("Base64ToString, JsonToObject, ArrayToCSString","WyJrYWZrYTA0LXByb2QwMi5tZXNzYWdlaHViLnNlcnZpY2VzLnVzLXNvdXRoLmJsdWVtaXgubmV0OjkwOTMiLCJrYWZrYTAzLXByb2QwMi5tZXNzYWdlaHViLnNlcnZpY2VzLnVzLXNvdXRoLmJsdWVtaXgubmV0OjkwOTMiLCJrYWZrYTA1LXByb2QwMi5tZXNzYWdlaHViLnNlcnZpY2VzLnVzLXNvdXRoLmJsdWVtaXgubmV0OjkwOTMiLCJrYWZrYTAyLXByb2QwMi5tZXNzYWdlaHViLnNlcnZpY2VzLnVzLXNvdXRoLmJsdWVtaXgubmV0OjkwOTMiLCJrYWZrYTAxLXByb2QwMi5tZXNzYWdlaHViLnNlcnZpY2VzLnVzLXNvdXRoLmJsdWVtaXgubmV0OjkwOTMiXQo=",
 			[]string{Base64ToString, JsonToObject, ArrayToCSString},
-			"kafka04-prod02.messagehub.services.us-south.bluemix.net:9093,kafka03-prod02.messagehub.services.us-south.bluemix.net:9093,kafka05-prod02.messagehub.services.us-south.bluemix.net:9093,kafka02-prod02.messagehub.services.us-south.bluemix.net:9093,kafka01-prod02.messagehub.services.us-south.bluemix.net:9093"},
-		{[]Planet{{Name: "Mercury", YearSpan: 88}, {Name: "Venus", YearSpan: 243}, {Name: "Earth", YearSpan: 365}},
+			"kafka04-prod02.messagehub.services.us-south.bluemix.net:9093,kafka03-prod02.messagehub.services.us-south.bluemix.net:9093,kafka05-prod02.messagehub.services.us-south.bluemix.net:9093,kafka02-prod02.messagehub.services.us-south.bluemix.net:9093,kafka01-prod02.messagehub.services.us-south.bluemix.net:9093"),
+		Entry("ObjectToJson", []Planet{{Name: "Mercury", YearSpan: 88}, {Name: "Venus", YearSpan: 243}, {Name: "Earth", YearSpan: 365}},
 			[]string{ObjectToJson},
-			"[{\"Name\":\"Mercury\",\"YearSpan\":88},{\"Name\":\"Venus\",\"YearSpan\":243},{\"Name\":\"Earth\",\"YearSpan\":365}]"},
-	}
-	for _, e := range tests {
-		t.Logf("inputValue = %v, transformers %v\n", e.value, e.transformerNames)
-		retValue, err := CompoundTransformerNames(e.value, e.transformerNames...)
-		if err != nil {
-			t.Fatalf("An unexpected error occurred: %v", err)
-		}
-		t.Logf("retValue = %v\n", retValue)
-		if !reflect.DeepEqual(retValue, e.exp) {
-			t.Fatalf("retruned value [%#v] is not equal to expected one [%#v]", retValue, e.exp)
-		}
-	}
+			"[{\"Name\":\"Mercury\",\"YearSpan\":88},{\"Name\":\"Venus\",\"YearSpan\":243},{\"Name\":\"Earth\",\"YearSpan\":365}]"),)
 
-}
+	DescribeTable("Test Array2CSStringTransformer",
+		func(inputVal interface{}, expectedVal interface{}){
+			Ω(Array2CSStringTransformer(inputVal)).Should(Equal(expectedVal))
+		},
+		Entry("strings array", []string{"a", "b", "cd", "efg"}, "a,b,cd,efg"),
+		Entry("int32 array",[]int32{1, 2, 34, 567}, "1,2,34,567"),
+		Entry("int64 array", []int64{1, 2, 34, 567}, "1,2,34,567"),
+		Entry("float32 array", []float32{1.1, 2.2, 34.3, 567.0, 1.234560e+02}, "1.1,2.2,34.3,567,123.456"),
+		Entry("float64 array", []float64{1.1, 2.2, 34.3, 567.0, 1.234560e+02}, "1.1,2.2,34.3,567,123.456"),
+		Entry("boolean array",[]bool{true, false, true}, "true,false,true"),
+		Entry("objects array",[]Planet{{Name: "Mercury", YearSpan: 88}, {Name: "Venus", YearSpan: 243}, {Name: "Earth", YearSpan: 365}},
+			"{Mercury 88},{Venus 243},{Earth 365}"),
+		Entry("single string", "test", "test"),
+		Entry("single int", 12, "12"),
+		Entry("single boolean", true, "true"),)
+})
+
+

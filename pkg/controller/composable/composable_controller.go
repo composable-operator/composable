@@ -23,7 +23,6 @@ import (
 	"time"
 
 	ibmcloudv1alpha1 "github.com/ibm/composable/pkg/apis/ibmcloud/v1alpha1"
-	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -45,21 +44,24 @@ import (
 )
 
 const (
-	getValueFrom = "getValueFrom"
-	defaultValue = "defaultValue"
-	name         = "name"
-	path         = "path"
-	namespace    = "namespace"
-	metadata     = "metadata"
-	kind         = "kind"
-	version      = "version"
-	spec         = "spec"
-	objectPrefix = ".Object"
-	transformers = "format-transformers"
+	getValueFrom   = "getValueFrom"
+	defaultValue   = "defaultValue"
+	name           = "name"
+	path           = "path"
+	namespace      = "namespace"
+	metadata       = "metadata"
+	kind           = "kind"
+	version        = "version"
+	spec           = "spec"
+	status         = "status"
+	state          = "state"
+	objectPrefix   = ".Object"
+	transformers   = "format-transformers"
+	controllerName = "Compasable-controller"
 
-	FailedStatus  = "Failed"
-	PendingStatus = "Pending"
-	OnlineStatus  = "Online"
+	FailedStatus   = "Failed"
+	PendingStatus  = "Pending"
+	OnlineStatus   = "Online"
 )
 
 // ReconcileComposable reconciles a Composable object
@@ -77,51 +79,34 @@ type composableCache struct {
 
 type reconcilerWithController interface {
 	reconcile.Reconciler
-	GetController() controller.Controller
+	getController() controller.Controller
+	setController( controller  controller.Controller)
 }
 
 var _ reconcilerWithController = &ReconcileComposable{}
 
 // Add creates a new Composable Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-// USER ACTION REQUIRED: update cmd/manager/main.go to call this ibmcloud.Add(mgr) to install this Controller
 func Add(mgr manager.Manager) error {
-	r, err := newReconciler(mgr)
-	if err != nil {
-		return err
-	}
-	return add(mgr, r)
+	return add(mgr, newReconciler(mgr))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) (reconcilerWithController, error) {
-	r := &ReconcileComposable{Client: mgr.GetClient(), scheme: mgr.GetScheme(), config: mgr.GetConfig()}
-	c, err := controller.New("composable-controller", mgr, controller.Options{Reconciler: r})
-	if err != nil {
-		return nil, err
-	}
-	r.controller = c
-	return r, nil
+func newReconciler(mgr manager.Manager) reconcilerWithController {
+	return  &ReconcileComposable{Client: mgr.GetClient(), scheme: mgr.GetScheme(), config: mgr.GetConfig()}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcilerWithController) error {
-
-	c := r.GetController()
-	// Watch for changes to Composable
-	err := c.Watch(&source.Kind{Type: &ibmcloudv1alpha1.Composable{}}, &handler.EnqueueRequestForObject{})
+	c, err := controller.New(controllerName , mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
-
-	// TODOMV: Replace here with type created
-	// TODO(user): Modify this to be the types you create
-	// Uncomment watch a Deployment created by Composable - change this for objects you create
-	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &ibmcloudv1alpha1.Composable{},
-	})
+	r.setController(c)
+	// Watch for changes to Composable
+	err = c.Watch(&source.Kind{Type: &ibmcloudv1alpha1.Composable{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
+		klog.Errorf("c.Watch returned %v\n", err)
 		return err
 	}
 
@@ -130,11 +115,9 @@ func add(mgr manager.Manager, r reconcilerWithController) error {
 
 func toJSONFromRaw(content *runtime.RawExtension) (interface{}, error) {
 	var data interface{}
-
 	if err := json.Unmarshal(content.Raw, &data); err != nil {
 		return nil, err
 	}
-
 	return data, nil
 }
 
@@ -252,7 +235,6 @@ func groupQualifiedName(name, group string) string {
 		Name:  name,
 		Group: group,
 	}
-
 	return GroupQualifiedName(apiResource)
 }
 
@@ -296,7 +278,6 @@ func (r *ReconcileComposable) LookupAPIResource(key, targetVersion string, cache
 				matchedResources = append(matchedResources, groupQualifiedName(resource.Name, gv.Group))
 			}
 		}
-
 	}
 	if len(matchedResources) > 1 {
 		return nil, fmt.Errorf("Multiple resources are matched by %q: %s. A group-qualified plural name must be provided.", key, strings.Join(matchedResources, ", "))
@@ -309,7 +290,7 @@ func (r *ReconcileComposable) LookupAPIResource(key, targetVersion string, cache
 	return nil, fmt.Errorf("Unable to find api resource named %q.", key)
 }
 
-func (r *ReconcileComposable) resolveValue(value interface{}, composableNamespace string, cache *composableCache) (interface{}, error) {
+	func (r *ReconcileComposable) resolveValue(value interface{}, composableNamespace string, cache *composableCache) (interface{}, error) {
 	if val, ok := value.(map[string]interface{}); ok {
 		if kind, ok := val[kind].(string); ok {
 			vers := ""
@@ -339,7 +320,7 @@ func (r *ReconcileComposable) resolveValue(value interface{}, composableNamespac
 							unstrObj = obj.(unstructured.Unstructured)
 						} else {
 							unstrObj = unstructured.Unstructured{}
-							unstrObj.SetAPIVersion(res.Version)
+							//unstrObj.SetAPIVersion(res.Version)
 							unstrObj.SetGroupVersionKind(groupVersionKind)
 							klog.V(5).Infof("Get Object %s\n", objNamespacedname)
 							err = r.Get(context.TODO(), objNamespacedname, &unstrObj)
@@ -427,8 +408,22 @@ func getNamespace(obj map[string]interface{}) (string, error) {
 	return "", fmt.Errorf("Failed: Template does not contain namespace")
 }
 
-func (r *ReconcileComposable) GetController() controller.Controller {
+func getState(obj map[string]interface{}) (string, error) {
+	if status, ok := obj[status].(map[string]interface{}); ok {
+		if state, ok := status[state]; ok {
+			return state.(string), nil
+		}
+		return "", fmt.Errorf("Failed: Composable doesn't contain status")
+	}
+	return "", fmt.Errorf("Failed: Composable doesn't contain state")
+}
+
+func (r *ReconcileComposable) getController() controller.Controller {
 	return r.controller
+}
+
+func (r *ReconcileComposable) setController(controller controller.Controller)  {
+	r.controller = controller
 }
 
 // Reconcile reads that state of the cluster for a Composable object and makes changes based on the state read
@@ -469,13 +464,14 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 		r.errorHandler(instance, err, PendingStatus, "", "Failed to read template data:")
 		return reconcile.Result{}, err
 	}
-
 	resource, err := r.resolve(object, instance.Namespace)
+
 	if err != nil {
 		if strings.Contains(err.Error(), FailedStatus) {
 			r.errorHandler(instance, err, FailedStatus, "", "")
 			return reconcile.Result{}, nil
 		}
+		klog.Errorf("Error !!! %v\n", err)
 		r.errorHandler(instance, err, PendingStatus, "", "Problem resolving template:")
 		return reconcile.Result{}, err
 	}
