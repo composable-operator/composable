@@ -11,19 +11,22 @@ spec:
     metadata:
       name:
         getValueFrom:
-          configMapRef:
-            name: myconfigmap
-            key: name
+          name: myconfigmap
+          kind: ConfigMap
+          path: '{.data.name}'
     spec:
       instancename: 
         getValueFrom:
-          configMapRef:
-            name: myconfigmap
-            key: name
+          name: myconfigmap
+          kind: ConfigMap
+          path: '{.data.name}'
+
       serviceClass: Event Streams
       plan: 
         getValueFrom:
-          secretKeyRef: 
-            name: mysecret
-            key: plan
+          kind: Secret
+          name: mysecret
+          path: '{.data.plan}'
+          format-transformers:
+          - "Base64ToString"
            

@@ -11,11 +11,11 @@ spec:
     metadata:
       name: mymessagehub
     spec:
-      instancename: mymessagehub
-      serviceClass: Event Streams
-      plan: 
+      serviceClass: messagehub
+      plan:
         getValueFrom:
-          secretKeyRef: 
-            name: mysecret
-            key: plan
-           
+          kind: Secret
+          name: mysecret
+          path: '{.data.plan}'
+          format-transformers:
+          - "Base64ToString"
