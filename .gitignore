@@ -23,3 +23,5 @@ zz_generated.*
 *.swp
 *.swo
 *~
+# MacOS files
+.DS_Store
