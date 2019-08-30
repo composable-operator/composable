@@ -558,7 +558,28 @@ func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Re
 	instance.Status.Message = time.Now().Format(time.RFC850)
 	err = r.Update(context.TODO(), instance)
 	if err != nil {
-		r.errorHandler(instance, err, FailedStatus, "", "")
+		if strings.Contains(err.Error(), "ResourceVersion: 0") {
+			// the Composable object was deleted
+			return reconcile.Result{}, nil
+		}
+		if strings.Contains(err.Error(), "the object has been modified") {
+			err = r.Get(context.TODO(), request.NamespacedName, instance)
+			if err == nil {
+				instance.Status.State = OnlineStatus
+				instance.Status.Message = time.Now().Format(time.RFC850)
+				err = r.Update(context.TODO(), instance)
+				if err != nil {
+					klog.Errorf("The second update status returned: %s", err.Error())
+				}
+				return reconcile.Result{}, err
+			}
+			if errors.IsNotFound(err) {
+				// The Composable object was deleted.
+				return reconcile.Result{}, nil
+			}
+
+		}
+		klog.Errorf("Update status returned: %s", err.Error())
 		return reconcile.Result{}, err
 	}
 	return reconcile.Result{}, nil

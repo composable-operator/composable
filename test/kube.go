@@ -55,4 +55,3 @@ func CreateNamespaceOrDie(namespaces corev1.NamespaceInterface, stem string) str
 	}
 	return ns.Name
 }
-
