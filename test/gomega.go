@@ -63,7 +63,6 @@ func GetUnstructuredObject(context context.Context, namespacedname types.Namespa
 	}
 }
 
-
 // GetState gets the object status from the store
 func GetState(context context.Context, comp *v1alpha1.Composable) func() string {
 	return func() string {
@@ -74,4 +73,3 @@ func GetState(context context.Context, comp *v1alpha1.Composable) func() string 
 		return ""
 	}
 }
-

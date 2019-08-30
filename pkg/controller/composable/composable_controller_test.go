@@ -35,12 +35,10 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog"
-	"k8s.io/klog/klogr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 )
 
 var (
@@ -52,12 +50,9 @@ var (
 	stop     chan struct{}
 )
 
-func init() {
-	logf.SetLogger(klogr.New())
+func TestComposable(t *testing.T) {
 	klog.InitFlags(flag.CommandLine)
 	klog.SetOutput(GinkgoWriter)
-}
-func TestComposable(t *testing.T) {
 
 	RegisterFailHandler(Fail)
 	SetDefaultEventuallyPollingInterval(1 * time.Second)

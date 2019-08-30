@@ -43,7 +43,6 @@ func DeleteInNs(context rcontext.Context, obj runtime.Object, async bool) {
 	DeleteObject(context, obj, async)
 }
 
-
 // Post the object
 func post(context rcontext.Context, obj runtime.Object, async bool, delay time.Duration) runtime.Object {
 	done := make(chan bool)
