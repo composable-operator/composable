@@ -36,15 +36,19 @@ spec:
                 type: boolean
             stringValue:
                 type: string
-            stringJson2Value:
+            stringFromBase64:
                 type: string
             arrayStrings:
-                type: array
-                items:
-                  type: string
+              type: array
+              items:
+                type: string
             arrayIntegers:
-                type: array
-                items:
-                  type: integer
+              type: array
+              items:
+                type: integer
             objectValue:
-                type: object
+              type: object
+            stringJson2Value:
+                type: string
+
+

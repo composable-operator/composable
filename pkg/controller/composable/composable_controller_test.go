@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"github.com/ibm/composable/pkg/apis"
-	context "github.com/ibm/composable/pkg/context"
+	"github.com/ibm/composable/pkg/context"
 	"github.com/ibm/composable/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -93,11 +93,68 @@ var _ = AfterSuite(func() {
 	t.Stop()
 })
 
-//var _ = Describe("composable", func() {
-//
-//	DescribeTable("should be ready",
-// TODO
-//})
+var _ = Describe("test Composable operations", func() {
+	dataDir := "testdata/"
+	unstrObj := unstructured.Unstructured{}
+	strArray := []interface{}{"kafka01-prod02.messagehub.services.us-south.bluemix.net:9093",
+		"kafka02-prod02.messagehub.services.us-south.bluemix.net:9093",
+		"kafka03-prod02.messagehub.services.us-south.bluemix.net:9093",
+		"kafka04-prod02.messagehub.services.us-south.bluemix.net:9093",
+		"kafka05-prod02.messagehub.services.us-south.bluemix.net:9093"}
+
+	It("Composable should successfully copy input data to the output object fields", func() {
+		By("Deploy input Object")
+		obj := test.LoadObject(dataDir+"inputDataObject.yaml", &unstructured.Unstructured{})
+		test.CreateObject(scontext, obj, true, 0)
+
+		By("Deploy Composable object")
+		comp := test.LoadCompasable(dataDir + "compCopy.yaml")
+		test.PostInNs(scontext, &comp, true, 0)
+		Eventually(test.GetObject(scontext, &comp)).ShouldNot(BeNil())
+
+		By("Get Output object")
+		groupVersionKind := schema.GroupVersionKind{Kind: "OutputValue", Version: "v1", Group: "test.ibmcloud.ibm.com"}
+		unstrObj.SetGroupVersionKind(groupVersionKind)
+		objNamespacedname := types.NamespacedName{Namespace: testNs, Name: "comp-out"}
+		klog.V(5).Infof("Get Object %s\n", objNamespacedname)
+		Eventually(test.GetUnstructuredObject(scontext, objNamespacedname, &unstrObj)).Should(Succeed())
+		testSpec, ok := unstrObj.Object[spec].(map[string]interface{})
+		Ω(ok).Should(BeTrue())
+
+		By("copy intValue")
+		// TODO should we check int type
+		Ω(testSpec["intValue"]).Should(BeEquivalentTo(12))
+
+		By("copy floatValue")
+		Ω(testSpec["floatValue"]).Should(BeEquivalentTo(23.5))
+
+		By("copy boolValue")
+		Ω(testSpec["boolValue"]).Should(BeTrue())
+
+		By("copy stringValue")
+		Ω(testSpec["stringValue"]).Should(BeEquivalentTo("Hello world"))
+
+		By("copy stringFromBase64")
+		Ω(testSpec["stringFromBase64"]).Should(BeEquivalentTo("9376"))
+
+		By("copy arrayStrings")
+		Ω(testSpec["arrayStrings"]).Should(BeEquivalentTo(strArray))
+
+		// TODO check why BeEquivalentTo doesn't work
+		//By("copy arrayIntegers")
+		//Ω(testSpec["arrayIntegers"]).Should(BeEquivalentTo([]interface{}{1,2,3,4}))
+
+		//By("copy objectValue")
+		//Ω(testSpec["objectValue"]).Should(BeEquivalentTo(map[string]interface {}{"family": "FamilyName", "first": "FirstName", "age": 27}))
+
+		// TODO check why BeEquivalentTo doesn't work
+		By("copy stringJson2Value")
+		val, _ := Array2CSStringTransformer(strArray)
+		Ω(testSpec["stringJson2Value"]).Should(BeEquivalentTo(val))
+
+	})
+
+})
 
 var _ = Describe("IBM cloud-operators compatibility", func() {
 	dataDir := "testdata/cloud-operators-data/"
@@ -108,8 +165,8 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 
 			comp := test.LoadCompasable(dataDir + "comp.yaml")
 			test.PostInNs(scontext, &comp, true, 0)
-
 			Eventually(test.GetObject(scontext, &comp)).ShouldNot(BeNil())
+
 			objNamespacedname := types.NamespacedName{Namespace: "default", Name: "mymessagehub"}
 			unstrObj := unstructured.Unstructured{}
 			unstrObj.SetGroupVersionKind(groupVersionKind)
@@ -133,7 +190,6 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 			obj := test.LoadObject(dataDir+"mysecret.yaml", &v1.Secret{})
 			test.PostInNs(scontext, obj, true, 0)
 			objNamespacedname = types.NamespacedName{Namespace: scontext.Namespace(), Name: "mymessagehub"}
-
 		})
 
 		AfterEach(func() {
@@ -142,9 +198,6 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 		})
 
 		It("should correctly create the Service instance according to parameters from a Secret object", func() {
-			//obj := test.LoadObject(dataDir +"mysecret.yaml", &v1.Secret{})
-			//test.PostInNs(scontext, obj, true, 0)
-
 			comp := test.LoadCompasable(dataDir + "comp1.yaml")
 			test.PostInNs(scontext, &comp, false, 0)
 			Eventually(test.GetObject(scontext, &comp)).ShouldNot(BeNil())
@@ -174,7 +227,6 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 			Eventually(test.GetUnstructuredObject(scontext, objNamespacedname, &unstrObj)).Should(Succeed())
 			Ω(getPlan(unstrObj.Object)).Should(Equal("standard"))
 			Eventually(test.GetObject(scontext, &comp)).ShouldNot(BeNil())
-			//fmt.Printf("Status %s\n", test.GetState(scontext, &comp)())
 			Eventually(test.GetState(scontext, &comp)).Should(Equal(OnlineStatus))
 			test.DeleteInNs(scontext, &comp, false)
 			Eventually(test.GetObject(scontext, &comp)).Should(BeNil())

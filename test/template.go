@@ -17,7 +17,6 @@
 package test
 
 import (
-	"fmt"
 	"io/ioutil"
 	"time"
 
@@ -34,7 +33,7 @@ import (
 // PostInNs the object
 func PostInNs(context rcontext.Context, obj runtime.Object, async bool, delay time.Duration) runtime.Object {
 	obj.(metav1.ObjectMetaAccessor).GetObjectMeta().SetNamespace(context.Namespace())
-	return post(context, obj, async, delay)
+	return CreateObject(context, obj, async, delay)
 }
 
 // DeletInNs the object
@@ -43,8 +42,8 @@ func DeleteInNs(context rcontext.Context, obj runtime.Object, async bool) {
 	DeleteObject(context, obj, async)
 }
 
-// Post the object
-func post(context rcontext.Context, obj runtime.Object, async bool, delay time.Duration) runtime.Object {
+// Creates the object
+func CreateObject(context rcontext.Context, obj runtime.Object, async bool, delay time.Duration) runtime.Object {
 	done := make(chan bool)
 
 	go func() {
@@ -54,7 +53,28 @@ func post(context rcontext.Context, obj runtime.Object, async bool, delay time.D
 		err := context.Client().Create(context, obj)
 		if err != nil {
 			klog.Errorf("Error: %v\n", err)
-			fmt.Printf("Error: %v\n", err)
+			//panic(err)
+		}
+		done <- true
+	}()
+
+	if !async {
+		<-done
+	}
+	return obj
+}
+
+// Updates the given object
+func UpdateObject(context rcontext.Context, obj runtime.Object, async bool, delay time.Duration) runtime.Object {
+	done := make(chan bool)
+
+	go func() {
+		if delay > 0 {
+			time.Sleep(delay)
+		}
+		err := context.Client().Update(context, obj)
+		if err != nil {
+			klog.Errorf("Error: %v\n", err)
 			//panic(err)
 		}
 		done <- true

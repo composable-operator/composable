@@ -1,0 +1,78 @@
+apiVersion: ibmcloud.ibm.com/v1alpha1
+kind: Composable
+metadata:
+  name: copy-values
+spec:
+  template: 
+    apiVersion: "test.ibmcloud.ibm.com/v1"
+    kind: OutputValue
+    metadata:
+      name: comp-out
+    spec:
+      instancename: compOut
+      intValue:
+        getValueFrom:
+          kind: InputValue
+          name: inputdata
+          namespace: default
+          path: '{.spec.intValue}'
+      floatValue:
+        getValueFrom:
+          kind: InputValue
+          name: inputdata
+          namespace: default
+          path: '{.spec.floatValue}'
+      boolValue:
+        getValueFrom:
+          kind: InputValue
+          name: inputdata
+          namespace: default
+          path: '{.spec.boolValue}'
+      stringValue:
+        getValueFrom:
+          kind: InputValue
+          name: inputdata
+          namespace: default
+          path: '{.spec.stringValue}'
+
+      stringFromBase64:
+        getValueFrom:
+          kind: InputValue
+          name: inputdata
+          namespace: default
+          path: '{.spec.base64Value}'
+          format-transformers:
+            - "Base64ToString"
+      arrayStrings:
+        getValueFrom:
+          kind: InputValue
+          name: inputdata
+          namespace: default
+          path: '{.spec.arrayStrings}'
+      arrayIntegers:
+        getValueFrom:
+          kind: InputValue
+          name: inputdata
+          namespace: default
+          path: '{.spec.arrayIntegers}'
+      objectValue:
+        getValueFrom:
+          kind: InputValue
+          name: inputdata
+          namespace: default
+          path: '{.spec.objectValue}'
+      stringJson2Value:
+        getValueFrom:
+          kind: InputValue
+          name: inputdata
+          namespace: default
+          path: '{.spec.jsonValue}'
+          format-transformers:
+            - "Base64ToString"
+            - "JsonToObject"
+            - "ArrayToCSString"
+
+
+
+
+

@@ -1,0 +1,28 @@
+apiVersion: "test.ibmcloud.ibm.com/v1"
+kind: InputValue
+metadata:
+  name: inputdata
+  namespace: default
+spec:
+  intValue: 12
+  floatValue: 23.5
+  boolValue: true
+  stringValue: "Hello world"
+  base64Value: "OTM3Ng=="  #9376
+  arrayStrings:
+    - "kafka01-prod02.messagehub.services.us-south.bluemix.net:9093"
+    - "kafka02-prod02.messagehub.services.us-south.bluemix.net:9093"
+    - "kafka03-prod02.messagehub.services.us-south.bluemix.net:9093"
+    - "kafka04-prod02.messagehub.services.us-south.bluemix.net:9093"
+    - "kafka05-prod02.messagehub.services.us-south.bluemix.net:9093"
+  arrayIntegers:
+    - 1
+    - 2
+    - 3
+    - 4
+  objectValue:
+    first: "FirstName"
+    family: "FamilyName"
+    age: 27
+  jsonValue: "WyJrYWZrYTAxLXByb2QwMi5tZXNzYWdlaHViLnNlcnZpY2VzLnVzLXNvdXRoLmJsdWVtaXgubmV0OjkwOTMiLCJrYWZrYTAyLXByb2QwMi5tZXNzYWdlaHViLnNlcnZpY2VzLnVzLXNvdXRoLmJsdWVtaXgubmV0OjkwOTMiLCJrYWZrYTAzLXByb2QwMi5tZXNzYWdlaHViLnNlcnZpY2VzLnVzLXNvdXRoLmJsdWVtaXgubmV0OjkwOTMiLCJrYWZrYTA0LXByb2QwMi5tZXNzYWdlaHViLnNlcnZpY2VzLnVzLXNvdXRoLmJsdWVtaXgubmV0OjkwOTMiLCJrYWZrYTA1LXByb2QwMi5tZXNzYWdlaHViLnNlcnZpY2VzLnVzLXNvdXRoLmJsdWVtaXgubmV0OjkwOTMiXQo="
+
