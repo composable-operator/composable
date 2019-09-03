@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
-package request
+package context
+
+// TODO check if we need this package
 
 import (
 	gocontext "context"
