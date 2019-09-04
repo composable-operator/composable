@@ -96,16 +96,27 @@ var _ = AfterSuite(func() {
 var _ = Describe("test Composable operations", func() {
 	dataDir := "testdata/"
 	unstrObj := unstructured.Unstructured{}
+
 	strArray := []interface{}{"kafka01-prod02.messagehub.services.us-south.bluemix.net:9093",
 		"kafka02-prod02.messagehub.services.us-south.bluemix.net:9093",
 		"kafka03-prod02.messagehub.services.us-south.bluemix.net:9093",
 		"kafka04-prod02.messagehub.services.us-south.bluemix.net:9093",
 		"kafka05-prod02.messagehub.services.us-south.bluemix.net:9093"}
 
-	It("Composable should successfully copy input data to the output object fields", func() {
-		By("Deploy input Object")
+	AfterEach(func() {
+		// delete the Composable object
+		comp := test.LoadCompasable(dataDir + "compCopy.yaml")
+		test.DeleteInNs(scontext, &comp, false)
+		Eventually(test.GetObject(scontext, &comp)).Should(BeNil())
+
 		obj := test.LoadObject(dataDir+"inputDataObject.yaml", &unstructured.Unstructured{})
-		test.CreateObject(scontext, obj, true, 0)
+		test.DeleteObject(scontext, obj, false)
+		Eventually(test.GetObject(scontext, obj)).Should(BeNil())
+
+	})
+
+	It("Composable should successfully set default values to the output object", func() {
+
 
 		By("Deploy Composable object")
 		comp := test.LoadCompasable(dataDir + "compCopy.yaml")
@@ -121,38 +132,174 @@ var _ = Describe("test Composable operations", func() {
 		testSpec, ok := unstrObj.Object[spec].(map[string]interface{})
 		Ω(ok).Should(BeTrue())
 
+		By("default intValue")
+		Ω(testSpec["intValue"]).Should(BeEquivalentTo(10))
+
+		By("default floatValue")
+		Ω(testSpec["floatValue"]).Should(BeEquivalentTo(10.1))
+
+		By("default boolValue")
+		Ω(testSpec["boolValue"]).Should(BeFalse())
+
+		By("default stringValue")
+		Ω(testSpec["stringValue"]).Should(Equal("default"))
+
+		By("default stringFromBase64")
+		Ω(testSpec["stringFromBase64"]).Should(Equal("default"))
+
+		By("default arrayStrings")
+		Ω(testSpec["arrayStrings"]).Should(BeEquivalentTo([]interface{}{"aa","bb","cc"}))
+
+		By("default arrayIntegers")
+		Ω(testSpec["arrayIntegers"]).Should(BeEquivalentTo([]interface{}{int64(1),int64(0),int64(1)}))
+
+		By("default objectValue")
+		Ω(testSpec["objectValue"]).Should(BeEquivalentTo(map[string]interface {}{"family": "DefaultFamilyName", "first": "DefaultFirstName", "age": int64(-1)}))
+
+		By("default stringJson2Value")
+		Ω(testSpec["stringJson2Value"]).Should(BeEquivalentTo("default1,default2,default3"))
+
+	})
+
+	It("Composable should successfully copy values to the output object", func() {
+
+		By("Deploy input Object")
+		obj := test.LoadObject(dataDir+"inputDataObject.yaml", &unstructured.Unstructured{})
+		test.CreateObject(scontext, obj, true, 0)
+
+		groupVersionKind := schema.GroupVersionKind{Kind: "InputValue", Version: "v1", Group: "test.ibmcloud.ibm.com"}
+		unstrObj.SetGroupVersionKind(groupVersionKind)
+		objNamespacedname := types.NamespacedName{Namespace: "default", Name: "inputdata"}
+		klog.V(5).Infof("Get Object %s\n", objNamespacedname)
+		Eventually(test.GetUnstructuredObject(scontext, objNamespacedname, &unstrObj)).Should(Succeed())
+
+		By("Deploy Composable object")
+		comp := test.LoadCompasable(dataDir + "compCopy.yaml")
+		test.PostInNs(scontext, &comp, true, 0)
+		Eventually(test.GetObject(scontext, &comp)).ShouldNot(BeNil())
+
+		By("Get Output object")
+		groupVersionKind = schema.GroupVersionKind{Kind: "OutputValue", Version: "v1", Group: "test.ibmcloud.ibm.com"}
+		unstrObj.SetGroupVersionKind(groupVersionKind)
+		objNamespacedname = types.NamespacedName{Namespace: testNs, Name: "comp-out"}
+		klog.V(5).Infof("Get Object %s\n", objNamespacedname)
+		Eventually(test.GetUnstructuredObject(scontext, objNamespacedname, &unstrObj)).Should(Succeed())
+		testSpec, ok := unstrObj.Object[spec].(map[string]interface{})
+		Ω(ok).Should(BeTrue())
+
 		By("copy intValue")
+		// We use Eventually so the controller will be able to update teh destination object
 		// TODO should we check int type
 		Ω(testSpec["intValue"]).Should(BeEquivalentTo(12))
-
+		//
 		By("copy floatValue")
-		Ω(testSpec["floatValue"]).Should(BeEquivalentTo(23.5))
+		Ω(testSpec["floatValue"].(float64)).Should(BeEquivalentTo(23.5))
 
 		By("copy boolValue")
 		Ω(testSpec["boolValue"]).Should(BeTrue())
 
 		By("copy stringValue")
-		Ω(testSpec["stringValue"]).Should(BeEquivalentTo("Hello world"))
+		Ω(testSpec["stringValue"]).Should(Equal("Hello world"))
 
 		By("copy stringFromBase64")
-		Ω(testSpec["stringFromBase64"]).Should(BeEquivalentTo("9376"))
+		Ω(testSpec["stringFromBase64"]).Should(Equal("9376"))
 
 		By("copy arrayStrings")
-		Ω(testSpec["arrayStrings"]).Should(BeEquivalentTo(strArray))
+		Ω(testSpec["arrayStrings"]).Should(Equal(strArray))
 
-		// TODO check why BeEquivalentTo doesn't work
-		//By("copy arrayIntegers")
-		//Ω(testSpec["arrayIntegers"]).Should(BeEquivalentTo([]interface{}{1,2,3,4}))
+		By("copy arrayIntegers")
+		Ω(testSpec["arrayIntegers"]).Should(Equal([]interface{}{int64(1),int64(2),int64(3),int64(4)}))
 
-		//By("copy objectValue")
-		//Ω(testSpec["objectValue"]).Should(BeEquivalentTo(map[string]interface {}{"family": "FamilyName", "first": "FirstName", "age": 27}))
+		By("copy objectValue")
+		Ω(testSpec["objectValue"]).Should(Equal(map[string]interface {}{"family": "FamilyName", "first": "FirstName", "age": int64(27)}))
 
-		// TODO check why BeEquivalentTo doesn't work
 		By("copy stringJson2Value")
 		val, _ := Array2CSStringTransformer(strArray)
 		Ω(testSpec["stringJson2Value"]).Should(BeEquivalentTo(val))
 
 	})
+
+	//It("Composable should successfully update values of the output object", func() {
+	//
+	//	By("check input object")
+	//	groupVersionKind1 := schema.GroupVersionKind{Kind: "InputValue", Version: "v1", Group: "test.ibmcloud.ibm.com"}
+	//	unstrObj.SetGroupVersionKind(groupVersionKind1)
+	//	objNamespacedname1 := types.NamespacedName{Namespace: "default", Name: "inputdata"}
+	//	err1 := test.GetUnstructuredObject(scontext, objNamespacedname1, &unstrObj)()
+	//	fmt.Printf("ERROR %v\n", err1)
+	//
+	//	By("check ouput object")
+	//	groupVersionKind2 := schema.GroupVersionKind{Kind: "OutputValue", Version: "v1", Group: "test.ibmcloud.ibm.com"}
+	//	unstrObj.SetGroupVersionKind(groupVersionKind2)
+	//	objNamespacedname2 := types.NamespacedName{Namespace: testNs, Name: "comp-out"}
+	//	err2 := test.GetUnstructuredObject(scontext, objNamespacedname2, &unstrObj)()
+	//	fmt.Printf("Error2 %v\n", err2)
+	//
+	//	By("Deploy Composable object")
+	//	comp := test.LoadCompasable(dataDir + "compCopy.yaml")
+	//	test.PostInNs(scontext, &comp, true, 0)
+	//	Eventually(test.GetObject(scontext, &comp)).ShouldNot(BeNil())
+	//
+	//	By("Get Output object")
+	//	groupVersionKind := schema.GroupVersionKind{Kind: "OutputValue", Version: "v1", Group: "test.ibmcloud.ibm.com"}
+	//	unstrObj.SetGroupVersionKind(groupVersionKind)
+	//	objNamespacedname := types.NamespacedName{Namespace: testNs, Name: "comp-out"}
+	//	klog.V(5).Infof("Get Object %s\n", objNamespacedname)
+	//	Eventually(test.GetUnstructuredObject(scontext, objNamespacedname, &unstrObj)).Should(Succeed())
+	//	testSpec, ok := unstrObj.Object[spec].(map[string]interface{})
+	//	Ω(ok).Should(BeTrue())
+	//	fmt.Printf("Object spec %+v\n", testSpec)
+	//
+	//	// Check some of default the values
+	//	By("first default intValue")
+	//	Ω(testSpec["intValue"]).Should(BeEquivalentTo(10))
+	//
+	//	By("default stringFromBase64")
+	//	Ω(testSpec["stringFromBase64"]).Should(Equal("default"))
+	//
+	//	By("Deploy input Object")
+	//	obj := test.LoadObject(dataDir+"inputDataObject.yaml", &unstructured.Unstructured{})
+	//	test.CreateObject(scontext, obj, true, 0)
+	//
+	//	groupVersionKind = schema.GroupVersionKind{Kind: "InputValue", Version: "v1", Group: "test.ibmcloud.ibm.com"}
+	//	unstrObj.SetGroupVersionKind(groupVersionKind)
+	//	objNamespacedname = types.NamespacedName{Namespace: "default", Name: "inputdata"}
+	//	klog.V(5).Infof("Get Object %s\n", objNamespacedname)
+	//	Eventually(test.GetUnstructuredObject(scontext, objNamespacedname, &unstrObj)).Should(Succeed())
+	//
+	//	By("get updated inValue")
+	//	Eventually( func() int64 {
+	//		test.GetUnstructuredObject(scontext, objNamespacedname, &unstrObj)
+	//		testSpec, _ = unstrObj.Object[spec].(map[string]interface{})
+	//		return testSpec["intValue"].(int64)
+	//	}).Should(Equal(int64(12)))
+	//
+	//	// Check other values
+	//	By("updated floatValue")
+	//	Ω(testSpec["floatValue"].(float64)).Should(BeEquivalentTo(23.5))
+	//
+	//	By("updated boolValue")
+	//	Ω(testSpec["boolValue"]).Should(BeTrue())
+	//
+	//	By("updated stringValue")
+	//	Ω(testSpec["stringValue"]).Should(Equal("Hello world"))
+	//
+	//	By("updated stringFromBase64")
+	//	Ω(testSpec["stringFromBase64"]).Should(Equal("9376"))
+	//
+	//	By("updated arrayStrings")
+	//	Ω(testSpec["arrayStrings"]).Should(Equal(strArray))
+	//
+	//	By("updated arrayIntegers")
+	//	Ω(testSpec["arrayIntegers"]).Should(Equal([]interface{}{int64(1),int64(2),int64(3),int64(4)}))
+	//
+	//	By("updated objectValue")
+	//	Ω(testSpec["objectValue"]).Should(Equal(map[string]interface {}{"family": "FamilyName", "first": "FirstName", "age": int64(27)}))
+	//
+	//	By("updated stringJson2Value")
+	//	val, _ := Array2CSStringTransformer(strArray)
+	//	Ω(testSpec["stringJson2Value"]).Should(BeEquivalentTo(val))
+	//})
 
 })
 
