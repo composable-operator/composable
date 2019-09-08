@@ -10,7 +10,6 @@ spec:
     kind: Service
     metadata:
       name: mymessagehub
-      namespace: default
     spec:
       plan: standard
       serviceClass: messagehub

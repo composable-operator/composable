@@ -127,8 +127,14 @@ func (r *ReconcileComposable) resolve(object interface{}, composableNamespace st
 	if _, ok := objMap[metadata]; !ok {
 		return unstructured.Unstructured{}, fmt.Errorf("Failed: Template has no metadata section")
 	}
+	// the underlying object should be created in the same namespace as teh Composable object
 	if metadata, ok := objMap[metadata].(map[string]interface{}); ok {
-		if _, ok := metadata[namespace]; !ok {
+		if ns, ok := metadata[namespace]; ok {
+			if composableNamespace != ns {
+				return unstructured.Unstructured{}, fmt.Errorf("Failed: Template defines a wrong namespace %v", ns)
+			}
+
+		} else {
 			metadata[namespace] = composableNamespace
 		}
 	} else {
