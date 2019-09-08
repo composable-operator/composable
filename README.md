@@ -141,9 +141,9 @@ The `getValueFrom` section can have a field for the `namespace`. In this case, t
 to look up the object that is being referenced. If the `namespace` field is absent then the namespace of 
 the Composable object itself is used instead.
 
-The template object can have a `namespace` specified in its `metadata` section. In that case, the underlying object is 
-created in that namespace. If the template does not have a `namespace` field, then the object is created in 
-the namespace of the `Composable` itself.
+The template object should be created in the same namespaces as the `Composable` object. Therefore, we recommend do not
+define `namespace` in the template. If the namespace field is defined and its value does not equal to the `Composable`
+object namespace, no objects will be created, and `Composable` object status will contain an errro.  
 
 ## Field path discovery
 
@@ -187,7 +187,7 @@ format-transformers:
 ## Deletion
 
 When the Composable object is deleted, the underlying object is deleted as well.
-However, currently if the user deletes the underlying object manually, it is not automatically recreated (future work).
+If the user deletes the underlying object manually, it is automatically recreated.
 
 
 

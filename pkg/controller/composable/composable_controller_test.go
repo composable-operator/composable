@@ -160,19 +160,20 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 	dataDir := "testdata/cloud-operators-data/"
 	groupVersionKind := schema.GroupVersionKind{Kind: "Service", Version: "v1alpha1", Group: "ibmcloud.ibm.com"}
 
-	Context("create Service instance from ibmcloud.ibm.com without external dependencies", func() {
+	Context("create Service instance from ibmcloud.ibm.com WITHOUT external dependencies", func() {
 		It("should correctly create the Service instance", func() {
 
 			comp := test.LoadCompasable(dataDir + "comp.yaml")
 			test.PostInNs(scontext, &comp, true, 0)
 			Eventually(test.GetObject(scontext, &comp)).ShouldNot(BeNil())
 
-			objNamespacedname := types.NamespacedName{Namespace: "default", Name: "mymessagehub"}
+			objNamespacedname := types.NamespacedName{Namespace: scontext.Namespace(), Name: "mymessagehub"}
 			unstrObj := unstructured.Unstructured{}
 			unstrObj.SetGroupVersionKind(groupVersionKind)
 			klog.V(5).Infof("Get Object %s\n", objNamespacedname)
 			Eventually(test.GetUnstructuredObject(scontext, objNamespacedname, &unstrObj)).Should(Succeed())
 			Eventually(test.GetState(scontext, &comp)).Should(Equal(OnlineStatus))
+
 		})
 
 		It("should delete the Composable and Service instances", func() {
@@ -183,7 +184,7 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 
 	})
 
-	Context("create Service instance from ibmcloud.ibm.com with external dependencies", func() {
+	Context("create Service instance from ibmcloud.ibm.com WITH external dependencies", func() {
 		var objNamespacedname types.NamespacedName
 
 		BeforeEach(func() {
