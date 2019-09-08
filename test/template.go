@@ -21,6 +21,7 @@ import (
 	"time"
 
 	yaml2 "github.com/ghodss/yaml"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog"
@@ -92,7 +93,7 @@ func DeleteObject(context rcontext.Context, obj runtime.Object, async bool) {
 
 	go func() {
 		err := context.Client().Delete(context, obj)
-		if err != nil {
+		if err != nil && ! errors.IsNotFound(err){
 			panic(err)
 		}
 		done <- true
