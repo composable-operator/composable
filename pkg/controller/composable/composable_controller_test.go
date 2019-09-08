@@ -18,6 +18,7 @@ package composable
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"path/filepath"
 	"testing"
@@ -277,6 +278,7 @@ var _ = Describe("test Composable operations", func() {
 			return testSpec["intValue"].(int64), nil
 		}).Should(Equal(int64(12)))
 
+		fmt.Printf("\nSpec %v+\n", testSpec)
 		// Check other values
 		By("updated floatValue")
 		Ω(testSpec["floatValue"].(float64)).Should(BeEquivalentTo(23.5))
