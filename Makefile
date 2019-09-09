@@ -17,7 +17,7 @@ deps:
 
 # Run tests
 test: generate fmt vet manifests
-	go test ./pkg/... ./cmd/... -coverprofile cover.out -test.v
+	go test ./pkg/... ./cmd/... -coverprofile cover.out -test.v -ginkgo.slowSpecThreshold=7
 
 # Build manager binary
 manager: generate fmt vet
