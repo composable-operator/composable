@@ -187,7 +187,7 @@ format-transformers:
 ## Deletion
 
 When the Composable object is deleted, the underlying object is deleted as well.
-If the user deletes the underlying object manually, it is automatically recreated.
+If the user deletes the underlying object manually, it is automatically recreated`.
 
 
 

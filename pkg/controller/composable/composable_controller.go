@@ -77,6 +77,10 @@ type composableCache struct {
 	resources []*metav1.APIResourceList
 }
 
+type toumbstone struct {
+	err error
+}
+
 type reconcilerWithController interface {
 	reconcile.Reconciler
 	getController() controller.Controller
@@ -322,8 +326,20 @@ func (r *ReconcileComposable) resolveValue(value interface{}, composableNamespac
 						}
 						groupVersionKind := schema.GroupVersionKind{Kind: res.Kind, Version: res.Version, Group: res.Group}
 						var unstrObj unstructured.Unstructured
-						if obj, ok := cache.objects[objectKey(objNamespacedname, groupVersionKind)]; ok {
-							unstrObj = obj.(unstructured.Unstructured)
+						key := objectKey(objNamespacedname, groupVersionKind)
+						if obj, ok := cache.objects[key]; ok {
+							switch obj.(type) {
+							case unstructured.Unstructured:
+								unstrObj = obj.(unstructured.Unstructured)
+							case toumbstone:
+								// we have checked the object and did not fined it
+								return errorToDefaultValue(val, obj.(toumbstone).err)
+							default:
+								err := fmt.Errorf("wrong type of cached object %T!", obj)
+								klog.Errorf("%s", err.Error())
+								return nil, err
+							}
+
 						} else {
 							unstrObj = unstructured.Unstructured{}
 							//unstrObj.SetAPIVersion(res.Version)
@@ -331,12 +347,13 @@ func (r *ReconcileComposable) resolveValue(value interface{}, composableNamespac
 							klog.V(5).Infof("Get Object %s\n", objNamespacedname)
 							err = r.Get(context.TODO(), objNamespacedname, &unstrObj)
 							if err != nil {
+								cache.objects[key] = toumbstone{err: err}
 								if errors.IsNotFound(err) {
 									return errorToDefaultValue(val, err)
 								}
 								return nil, err
 							}
-							cache.objects[objectKey(objNamespacedname, groupVersionKind)] = unstrObj
+							cache.objects[key] = unstrObj
 						}
 						j := jsonpath.New("compose")
 						// add ".Object" to the path
