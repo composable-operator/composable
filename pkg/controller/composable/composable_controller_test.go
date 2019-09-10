@@ -18,7 +18,6 @@ package composable
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"path/filepath"
 	"testing"
@@ -76,7 +75,8 @@ var _ = BeforeSuite(func() {
 		log.Fatal(err)
 	}
 
-	mgr, err := manager.New(cfg, manager.Options{})
+	syncPeriod := 30 * time.Second // set a sync period
+	mgr, err := manager.New(cfg, manager.Options{SyncPeriod: &syncPeriod})
 	Expect(err).NotTo(HaveOccurred())
 
 	c = mgr.GetClient()
@@ -173,7 +173,6 @@ var _ = Describe("test Composable operations", func() {
 		klog.V(5).Infof("Get Object %s\n", objNamespacedname)
 		Eventually(test.GetUnstructuredObject(scontext, objNamespacedname, &unstrObj)).Should(Succeed())
 
-		fmt.Println("Deploy Composable object")
 		By("Deploy Composable object")
 		comp := test.LoadCompasable(dataDir + "compCopy.yaml")
 		test.PostInNs(scontext, &comp, true, 0)

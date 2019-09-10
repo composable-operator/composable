@@ -458,7 +458,6 @@ func (r *ReconcileComposable) setController(controller controller.Controller) {
 // +kubebuilder:rbac:groups=ibmcloud.ibm.com,resources=composables,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileComposable) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	klog.V(5).Infoln("Start Reconcile loop")
-	fmt.Println("Start Reconcile loop")
 	// Fetch the Composable instance
 	instance := &ibmcloudv1alpha1.Composable{}
 	err := r.Get(context.TODO(), request.NamespacedName, instance)

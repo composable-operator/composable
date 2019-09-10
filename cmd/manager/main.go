@@ -17,6 +17,7 @@ package main
 import (
 	"flag"
 	"os"
+	"time"
 
 	"github.com/ibm/composable/pkg/apis"
 	"github.com/ibm/composable/pkg/controller"
@@ -52,6 +53,7 @@ func main() {
 	if flag.Lookup("kubeconfig") == nil {
 		flag.String("kubeconfig", os.Getenv("KUBECONFIG"), "Path to a kube config. Only required if out-of-cluster.")
 	}
+	syncPeriod := flag.Duration("syncPeriod", 30 * time.Second, "Defines the minimum frequency at which watched Compsable resources are reconciled." )
 	flag.Parse()
 	// build config for the  cluster
 	cfg, err := BuildConfig(kubeconfig)
@@ -66,7 +68,7 @@ func main() {
 	//}
 
 	// Create a new Cmd to provide shared dependencies and start components
-	mgr, err := manager.New(cfg, manager.Options{})
+	mgr, err := manager.New(cfg, manager.Options{SyncPeriod: syncPeriod})
 	if err != nil {
 		klog.Fatalf("manager.New returned error: %q", err.Error())
 	}
