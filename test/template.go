@@ -27,31 +27,29 @@ import (
 	"k8s.io/klog"
 
 	"github.com/ibm/composable/pkg/apis/ibmcloud/v1alpha1"
-
-	rcontext "github.com/ibm/composable/pkg/context"
 )
 
 // PostInNs the object
-func PostInNs(context rcontext.Context, obj runtime.Object, async bool, delay time.Duration) runtime.Object {
-	obj.(metav1.ObjectMetaAccessor).GetObjectMeta().SetNamespace(context.Namespace())
-	return CreateObject(context, obj, async, delay)
+func PostInNs(tContext TestContext, obj runtime.Object, async bool, delay time.Duration) runtime.Object {
+	obj.(metav1.ObjectMetaAccessor).GetObjectMeta().SetNamespace(tContext.Namespace())
+	return CreateObject(tContext, obj, async, delay)
 }
 
 // DeletInNs the object
-func DeleteInNs(context rcontext.Context, obj runtime.Object, async bool) {
-	obj.(metav1.ObjectMetaAccessor).GetObjectMeta().SetNamespace(context.Namespace())
-	DeleteObject(context, obj, async)
+func DeleteInNs(tContext TestContext, obj runtime.Object, async bool) {
+	obj.(metav1.ObjectMetaAccessor).GetObjectMeta().SetNamespace(tContext.Namespace())
+	DeleteObject(tContext, obj, async)
 }
 
 // Creates the object
-func CreateObject(context rcontext.Context, obj runtime.Object, async bool, delay time.Duration) runtime.Object {
+func CreateObject(tContext TestContext, obj runtime.Object, async bool, delay time.Duration) runtime.Object {
 	done := make(chan bool)
 
 	go func() {
 		if delay > 0 {
 			time.Sleep(delay)
 		}
-		err := context.Client().Create(context, obj)
+		err := tContext.Client().Create(tContext, obj)
 		if err != nil {
 			klog.Errorf("Error: %v\n", err)
 			//panic(err)
@@ -66,14 +64,14 @@ func CreateObject(context rcontext.Context, obj runtime.Object, async bool, dela
 }
 
 // Updates the given object
-func UpdateObject(context rcontext.Context, obj runtime.Object, async bool, delay time.Duration) runtime.Object {
+func UpdateObject(tContext TestContext, obj runtime.Object, async bool, delay time.Duration) runtime.Object {
 	done := make(chan bool)
 
 	go func() {
 		if delay > 0 {
 			time.Sleep(delay)
 		}
-		err := context.Client().Update(context, obj)
+		err := tContext.Client().Update(tContext, obj)
 		if err != nil {
 			klog.Errorf("Error: %v\n", err)
 			//panic(err)
@@ -88,12 +86,12 @@ func UpdateObject(context rcontext.Context, obj runtime.Object, async bool, dela
 }
 
 // DeleteObject deletes an object
-func DeleteObject(context rcontext.Context, obj runtime.Object, async bool) {
+func DeleteObject(tContext TestContext, obj runtime.Object, async bool) {
 	done := make(chan bool)
 
 	go func() {
-		err := context.Client().Delete(context, obj)
-		if err != nil && ! errors.IsNotFound(err){
+		err := tContext.Client().Delete(tContext, obj)
+		if err != nil && !errors.IsNotFound(err) {
 			panic(err)
 		}
 		done <- true

@@ -53,7 +53,7 @@ func main() {
 	if flag.Lookup("kubeconfig") == nil {
 		flag.String("kubeconfig", os.Getenv("KUBECONFIG"), "Path to a kube config. Only required if out-of-cluster.")
 	}
-	syncPeriod := flag.Duration("syncPeriod", 30 * time.Second, "Defines the minimum frequency at which watched Compsable resources are reconciled." )
+	syncPeriod := flag.Duration("syncPeriod", 30*time.Second, "Defines the minimum frequency at which watched Compsable resources are reconciled.")
 	flag.Parse()
 	// build config for the  cluster
 	cfg, err := BuildConfig(kubeconfig)
