@@ -14,56 +14,44 @@
  * limitations under the License.
  */
 
-package context
-
-// TODO check if we need this package
+package test
 
 import (
-	gocontext "context"
+	"context"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-// Context represents a reconcile context
-type Context interface {
-	gocontext.Context
+// TestContext represents a context for test operations
+type TestContext interface {
+	context.Context
 
-	// The dynamic client associated with the request
+	// The dynamic client
 	Client() client.Client
 
 	// The object namespace being reconciled
 	Namespace() string
-
-	// The object name being reconciled
-	Name() string
 }
 
 type reconcileContext struct {
-	gocontext.Context
-	cl        client.Client
+	context.Context
+	client    client.Client
 	namespace string
-	name      string
 }
 
 // New creates a reconcile context
-func New(client client.Client, request reconcile.Request) Context {
+func NewTestContext(client client.Client, namespace string) TestContext {
 	return &reconcileContext{
-		Context:   gocontext.Background(),
-		cl:        client,
-		namespace: request.Namespace,
-		name:      request.Name,
+		Context:   context.Background(),
+		client:    client,
+		namespace: namespace,
 	}
 }
 
 func (c *reconcileContext) Client() client.Client {
-	return c.cl
+	return c.client
 }
 
 func (c *reconcileContext) Namespace() string {
 	return c.namespace
-}
-
-func (c *reconcileContext) Name() string {
-	return c.name
 }

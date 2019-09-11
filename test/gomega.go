@@ -17,7 +17,7 @@
 package test
 
 import (
-	con "context"
+	"context"
 
 	"github.com/ibm/composable/pkg/apis/ibmcloud/v1alpha1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -27,9 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	Ω "github.com/onsi/gomega"
-
-	"github.com/ibm/composable/pkg/context"
-	//resv1 "github.com/ibm/composable/pkg/lib/resource/v1"
 )
 
 // StartTestManager starts the manager
@@ -42,13 +39,13 @@ func StartTestManager(mgr manager.Manager) chan struct{} {
 }
 
 //GetObject gets the object from the store
-func GetObject(context context.Context, obj runtime.Object) func() runtime.Object {
+func GetObject(tContext TestContext, obj runtime.Object) func() runtime.Object {
 	return func() runtime.Object {
 		key, err := client.ObjectKeyFromObject(obj)
 		if err != nil {
 			return nil
 		}
-		if err := context.Client().Get(context, key, obj); err != nil {
+		if err := tContext.Client().Get(tContext, key, obj); err != nil {
 			return nil
 		}
 		return obj
@@ -56,17 +53,17 @@ func GetObject(context context.Context, obj runtime.Object) func() runtime.Objec
 }
 
 //GetObject gets the object from the store
-func GetUnstructuredObject(context context.Context, namespacedname types.NamespacedName, obj *unstructured.Unstructured) func() error {
+func GetUnstructuredObject(tContext TestContext, namespacedname types.NamespacedName, obj *unstructured.Unstructured) func() error {
 	return func() error {
-		client := context.Client()
-		return client.Get(con.TODO(), namespacedname, obj)
+		client := tContext.Client()
+		return client.Get(context.TODO(), namespacedname, obj)
 	}
 }
 
 // GetState gets the object status from the store
-func GetState(context context.Context, comp *v1alpha1.Composable) func() string {
+func GetState(tContext TestContext, comp *v1alpha1.Composable) func() string {
 	return func() string {
-		if obj := GetObject(context, comp)(); comp != nil {
+		if obj := GetObject(tContext, comp)(); comp != nil {
 			c := obj.(*v1alpha1.Composable)
 			return c.Status.State
 		}
