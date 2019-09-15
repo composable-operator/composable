@@ -11,38 +11,38 @@ import (
 	"sync"
 
 	"golang.org/x/tools/internal/jsonrpc2"
-	"golang.org/x/tools/internal/lsp/cache"
 	"golang.org/x/tools/internal/lsp/protocol"
 	"golang.org/x/tools/internal/lsp/source"
-	"golang.org/x/tools/internal/lsp/xlog"
 	"golang.org/x/tools/internal/span"
 )
 
 // NewClientServer
-func NewClientServer(client protocol.Client) *Server {
-	return &Server{
-		client: client,
-		log:    xlog.New(protocol.NewLogger(client)),
+func NewClientServer(ctx context.Context, cache source.Cache, client protocol.Client) (context.Context, *Server) {
+	ctx = protocol.WithClient(ctx, client)
+	return ctx, &Server{
+		client:  client,
+		session: cache.NewSession(ctx),
 	}
 }
 
 // NewServer starts an LSP server on the supplied stream, and waits until the
 // stream is closed.
-func NewServer(stream jsonrpc2.Stream) *Server {
+func NewServer(ctx context.Context, cache source.Cache, stream jsonrpc2.Stream) (context.Context, *Server) {
 	s := &Server{}
-	s.Conn, s.client, s.log = protocol.NewServer(stream, s)
-	return s
+	ctx, s.Conn, s.client = protocol.NewServer(ctx, stream, s)
+	s.session = cache.NewSession(ctx)
+	return ctx, s
 }
 
 // RunServerOnPort starts an LSP server on the given port and does not exit.
 // This function exists for debugging purposes.
-func RunServerOnPort(ctx context.Context, port int, h func(s *Server)) error {
-	return RunServerOnAddress(ctx, fmt.Sprintf(":%v", port), h)
+func RunServerOnPort(ctx context.Context, cache source.Cache, port int, h func(ctx context.Context, s *Server)) error {
+	return RunServerOnAddress(ctx, cache, fmt.Sprintf(":%v", port), h)
 }
 
 // RunServerOnPort starts an LSP server on the given port and does not exit.
 // This function exists for debugging purposes.
-func RunServerOnAddress(ctx context.Context, addr string, h func(s *Server)) error {
+func RunServerOnAddress(ctx context.Context, cache source.Cache, addr string, h func(ctx context.Context, s *Server)) error {
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
@@ -52,10 +52,7 @@ func RunServerOnAddress(ctx context.Context, addr string, h func(s *Server)) err
 		if err != nil {
 			return err
 		}
-		stream := jsonrpc2.NewHeaderStream(conn, conn)
-		s := NewServer(stream)
-		h(s)
-		go s.Run(ctx)
+		h(NewServer(ctx, cache, jsonrpc2.NewHeaderStream(conn, conn)))
 	}
 }
 
@@ -63,38 +60,37 @@ func (s *Server) Run(ctx context.Context) error {
 	return s.Conn.Run(ctx)
 }
 
+type serverState int
+
+const (
+	serverCreated      = serverState(iota)
+	serverInitializing // set once the server has received "initialize" request
+	serverInitialized  // set once the server has received "initialized" request
+	serverShutDown
+)
+
 type Server struct {
 	Conn   *jsonrpc2.Conn
 	client protocol.Client
-	log    xlog.Logger
 
-	initializedMu sync.Mutex
-	isInitialized bool // set once the server has received "initialize" request
+	stateMu sync.Mutex
+	state   serverState
 
-	// Configurations.
-	// TODO(rstambler): Separate these into their own struct?
-	usePlaceholders               bool
-	enhancedHover                 bool
-	insertTextFormat              protocol.InsertTextFormat
-	configurationSupported        bool
-	dynamicConfigurationSupported bool
-	preferredContentFormat        protocol.MarkupKind
-
-	textDocumentSyncKind protocol.TextDocumentSyncKind
-
-	viewMu  sync.Mutex
-	views   []*cache.View
-	viewMap map[span.URI]*cache.View
+	session source.Session
 
 	// undelivered is a cache of any diagnostics that the server
 	// failed to deliver for some reason.
 	undeliveredMu sync.Mutex
 	undelivered   map[span.URI][]source.Diagnostic
+
+	// folders is only valid between initialize and initialized, and holds the
+	// set of folders to build views for when we are ready
+	pendingFolders []protocol.WorkspaceFolder
 }
 
 // General
 
-func (s *Server) Initialize(ctx context.Context, params *protocol.InitializeParams) (*protocol.InitializeResult, error) {
+func (s *Server) Initialize(ctx context.Context, params *protocol.ParamInitia) (*protocol.InitializeResult, error) {
 	return s.initialize(ctx, params)
 }
 
@@ -120,8 +116,8 @@ func (s *Server) DidChangeConfiguration(context.Context, *protocol.DidChangeConf
 	return notImplemented("DidChangeConfiguration")
 }
 
-func (s *Server) DidChangeWatchedFiles(context.Context, *protocol.DidChangeWatchedFilesParams) error {
-	return notImplemented("DidChangeWatchedFiles")
+func (s *Server) DidChangeWatchedFiles(ctx context.Context, params *protocol.DidChangeWatchedFilesParams) error {
+	return s.didChangeWatchedFiles(ctx, params)
 }
 
 func (s *Server) Symbol(context.Context, *protocol.WorkspaceSymbolParams) ([]protocol.SymbolInformation, error) {
@@ -135,7 +131,7 @@ func (s *Server) ExecuteCommand(context.Context, *protocol.ExecuteCommandParams)
 // Text Synchronization
 
 func (s *Server) DidOpen(ctx context.Context, params *protocol.DidOpenTextDocumentParams) error {
-	return s.cacheAndDiagnose(ctx, span.NewURI(params.TextDocument.URI), params.TextDocument.Text)
+	return s.didOpen(ctx, params)
 }
 
 func (s *Server) DidChange(ctx context.Context, params *protocol.DidChangeTextDocumentParams) error {
@@ -164,35 +160,35 @@ func (s *Server) Completion(ctx context.Context, params *protocol.CompletionPara
 	return s.completion(ctx, params)
 }
 
-func (s *Server) CompletionResolve(context.Context, *protocol.CompletionItem) (*protocol.CompletionItem, error) {
-	return nil, notImplemented("CompletionResolve")
+func (s *Server) Resolve(ctx context.Context, item *protocol.CompletionItem) (*protocol.CompletionItem, error) {
+	return nil, notImplemented("completionItem/resolve")
 }
 
-func (s *Server) Hover(ctx context.Context, params *protocol.TextDocumentPositionParams) (*protocol.Hover, error) {
+func (s *Server) Hover(ctx context.Context, params *protocol.HoverParams) (*protocol.Hover, error) {
 	return s.hover(ctx, params)
 }
 
-func (s *Server) SignatureHelp(ctx context.Context, params *protocol.TextDocumentPositionParams) (*protocol.SignatureHelp, error) {
+func (s *Server) SignatureHelp(ctx context.Context, params *protocol.SignatureHelpParams) (*protocol.SignatureHelp, error) {
 	return s.signatureHelp(ctx, params)
 }
 
-func (s *Server) Definition(ctx context.Context, params *protocol.TextDocumentPositionParams) ([]protocol.Location, error) {
+func (s *Server) Definition(ctx context.Context, params *protocol.DefinitionParams) ([]protocol.Location, error) {
 	return s.definition(ctx, params)
 }
 
-func (s *Server) TypeDefinition(ctx context.Context, params *protocol.TextDocumentPositionParams) ([]protocol.Location, error) {
+func (s *Server) TypeDefinition(ctx context.Context, params *protocol.TypeDefinitionParams) ([]protocol.Location, error) {
 	return s.typeDefinition(ctx, params)
 }
 
-func (s *Server) Implementation(context.Context, *protocol.TextDocumentPositionParams) ([]protocol.Location, error) {
+func (s *Server) Implementation(context.Context, *protocol.ImplementationParams) ([]protocol.Location, error) {
 	return nil, notImplemented("Implementation")
 }
 
-func (s *Server) References(context.Context, *protocol.ReferenceParams) ([]protocol.Location, error) {
-	return nil, notImplemented("References")
+func (s *Server) References(ctx context.Context, params *protocol.ReferenceParams) ([]protocol.Location, error) {
+	return s.references(ctx, params)
 }
 
-func (s *Server) DocumentHighlight(ctx context.Context, params *protocol.TextDocumentPositionParams) ([]protocol.DocumentHighlight, error) {
+func (s *Server) DocumentHighlight(ctx context.Context, params *protocol.DocumentHighlightParams) ([]protocol.DocumentHighlight, error) {
 	return s.documentHighlight(ctx, params)
 }
 
@@ -240,37 +236,39 @@ func (s *Server) OnTypeFormatting(context.Context, *protocol.DocumentOnTypeForma
 	return nil, notImplemented("OnTypeFormatting")
 }
 
-func (s *Server) Rename(context.Context, *protocol.RenameParams) (*protocol.WorkspaceEdit, error) {
-	return nil, notImplemented("Rename")
+func (s *Server) Rename(ctx context.Context, params *protocol.RenameParams) (*protocol.WorkspaceEdit, error) {
+	return s.rename(ctx, params)
 }
 
-func (s *Server) Declaration(context.Context, *protocol.TextDocumentPositionParams) ([]protocol.DeclarationLink, error) {
+func (s *Server) Declaration(context.Context, *protocol.DeclarationParams) ([]protocol.DeclarationLink, error) {
 	return nil, notImplemented("Declaration")
 }
 
-func (s *Server) FoldingRange(context.Context, *protocol.FoldingRangeParams) ([]protocol.FoldingRange, error) {
-	return nil, notImplemented("FoldingRange")
+func (s *Server) FoldingRange(ctx context.Context, params *protocol.FoldingRangeParams) ([]protocol.FoldingRange, error) {
+	return s.foldingRange(ctx, params)
 }
 
 func (s *Server) LogTraceNotification(context.Context, *protocol.LogTraceParams) error {
 	return notImplemented("LogtraceNotification")
 }
 
-func (s *Server) PrepareRename(context.Context, *protocol.TextDocumentPositionParams) (*protocol.Range, error) {
-	return nil, notImplemented("PrepareRename")
+func (s *Server) PrepareRename(ctx context.Context, params *protocol.PrepareRenameParams) (*protocol.Range, error) {
+	// TODO(suzmue): support sending placeholder text.
+	return s.prepareRename(ctx, params)
 }
 
-func (s *Server) Resolve(context.Context, *protocol.CompletionItem) (*protocol.CompletionItem, error) {
-	return nil, notImplemented("Resolve")
-}
-
-func (s *Server) SelectionRange(context.Context, *protocol.SelectionRangeParams) ([][]protocol.SelectionRange, error) {
-	return nil, notImplemented("SelectionRange")
+func (s *Server) Progress(context.Context, *protocol.ProgressParams) error {
+	return notImplemented("Progress")
 }
 
 func (s *Server) SetTraceNotification(context.Context, *protocol.SetTraceParams) error {
 	return notImplemented("SetTraceNotification")
 }
+
+func (s *Server) SelectionRange(context.Context, *protocol.SelectionRangeParams) ([]protocol.SelectionRange, error) {
+	return nil, notImplemented("SelectionRange")
+}
+
 func notImplemented(method string) *jsonrpc2.Error {
 	return jsonrpc2.NewErrorf(jsonrpc2.CodeMethodNotFound, "method %q not yet implemented", method)
 }

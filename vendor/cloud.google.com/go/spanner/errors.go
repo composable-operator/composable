@@ -71,8 +71,10 @@ func toSpannerError(err error) error {
 	return toSpannerErrorWithMetadata(err, nil)
 }
 
-// toSpannerErrorWithMetadata converts general Go error and grpc trailers to *spanner.Error.
-// Note: modifies original error if trailers aren't nil
+// toSpannerErrorWithMetadata converts general Go error and grpc trailers to
+// *spanner.Error.
+//
+// Note: modifies original error if trailers aren't nil.
 func toSpannerErrorWithMetadata(err error, trailers metadata.MD) error {
 	if err == nil {
 		return nil
@@ -88,10 +90,10 @@ func toSpannerErrorWithMetadata(err error, trailers metadata.MD) error {
 		return &Error{codes.DeadlineExceeded, err.Error(), trailers}
 	case err == context.Canceled:
 		return &Error{codes.Canceled, err.Error(), trailers}
-	case grpc.Code(err) == codes.Unknown:
+	case status.Code(err) == codes.Unknown:
 		return &Error{codes.Unknown, err.Error(), trailers}
 	default:
-		return &Error{grpc.Code(err), grpc.ErrorDesc(err), trailers}
+		return &Error{status.Code(err), grpc.ErrorDesc(err), trailers}
 	}
 }
 

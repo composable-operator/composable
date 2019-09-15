@@ -67,13 +67,15 @@ const (
 // ReconcileComposable reconciles a Composable object
 type ReconcileComposable struct {
 	client.Client
-	config     *rest.Config
-	scheme     *runtime.Scheme
-	controller controller.Controller
+	discoveryClient  discovery.DiscoveryInterface
+	config           *rest.Config
+	scheme           *runtime.Scheme
+	controller       controller.Controller
 }
 
 type composableCache struct {
 	objects   map[string]interface{}
+	// TODO replace by mem cache from K8s 1.14
 	resources []*metav1.APIResourceList
 }
 
@@ -97,7 +99,9 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcilerWithController {
-	return &ReconcileComposable{Client: mgr.GetClient(), scheme: mgr.GetScheme(), config: mgr.GetConfig()}
+	cfg := mgr.GetConfig()
+	discoveryClient := discovery.NewDiscoveryClientForConfigOrDie(cfg)
+	return &ReconcileComposable{Client: mgr.GetClient(), discoveryClient: discoveryClient, scheme: mgr.GetScheme(), config: cfg}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -124,6 +128,20 @@ func toJSONFromRaw(content *runtime.RawExtension) (interface{}, error) {
 	}
 	return data, nil
 }
+
+//func (r *ReconcileComposable) InjectStopChannel(stop <-chan struct{}) error {
+//	go func() {
+//		select {
+//		case <-time.After(1 * time.Minute):
+//			klog.V(5).Infof("Call discovery client cache invalidation")
+//			r.discoveryClient.Invalidate()
+//			case  <-stop:
+//				return
+//		}
+//
+//	}()
+//	return nil
+//}
 
 func (r *ReconcileComposable) resolve(object interface{}, composableNamespace string) (unstructured.Unstructured, error) {
 	// Set namespace if undefined
@@ -208,20 +226,19 @@ func (r *ReconcileComposable) resolveFields(fields interface{}, composableNamesp
 	return fields, nil
 }
 
-func GetServerPreferredResources(config *rest.Config) ([]*metav1.APIResourceList, error) {
-	// TODO Consider using a caching scheme ala kubectl
-	client, err := discovery.NewDiscoveryClientForConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("Error creating discovery client %v", err)
-	}
-
-	resourceLists, err := client.ServerPreferredResources()
-	client.ServerResources()
+func (r *ReconcileComposable) GetServerPreferredResources() ([]*metav1.APIResourceList, error) {
+	//client, err := discovery.NewDiscoveryClientForConfig(config)
+	//if err != nil {
+	//	return nil, fmt.Errorf("Error creating discovery client %v", err)
+	//}
+	resourceLists, err := r.discoveryClient.ServerPreferredResources()
+	//resourceLists, err := client.ServerPreferredResources()
 	if err != nil {
 		return nil, fmt.Errorf("Error listing api resources, %v", err)
 	}
 	return resourceLists, nil
 }
+
 
 func NameMatchesResource(name string, apiResource metav1.APIResource, group string) bool {
 	lowerCaseName := strings.ToLower(name)
@@ -255,16 +272,27 @@ func GroupQualifiedName(apiResource metav1.APIResource) string {
 	return fmt.Sprintf("%s.%s", apiResource.Name, apiResource.Group)
 }
 
-func (r *ReconcileComposable) LookupAPIResource(key, targetVersion string, cache *composableCache) (*metav1.APIResource, error) {
-	if cache.resources == nil {
-		klog.V(6).Infoln("Resources is nil")
-		resourceList, err := GetServerPreferredResources(r.config)
+func (r *ReconcileComposable) LookupAPIResource(kind, apiVersion string, cache *composableCache) (*metav1.APIResource, error) {
+
+	var resources []*metav1.APIResourceList
+	if len(apiVersion) > 0  {
+		// TODO comment it out
+		res, err := r.discoveryClient.ServerResourcesForGroupVersion(apiVersion)
 		if err != nil {
 			return nil, err
 		}
-		cache.resources = resourceList
+		resources = []*metav1.APIResourceList{res}
+	} else {
+		if cache.resources == nil {
+			klog.V(6).Infoln("Resources is nil")
+			resourceList, err := r.GetServerPreferredResources()
+			if err != nil {
+				return nil, err
+			}
+			cache.resources = resourceList
+		}
+		resources = cache.resources
 	}
-	resources := cache.resources
 
 	var targetResource *metav1.APIResource
 	var matchedResources []string
@@ -274,12 +302,10 @@ func (r *ReconcileComposable) LookupAPIResource(key, targetVersion string, cache
 		if err != nil {
 			return nil, fmt.Errorf("Error parsing GroupVersion: %v", err)
 		}
-		if len(targetVersion) > 0 && gv.Version != targetVersion {
-			continue
-		}
+
 		for _, resource := range resourceList.APIResources {
 			group := gv.Group
-			if NameMatchesResource(key, resource, group) {
+			if NameMatchesResource(kind, resource, group) {
 				if targetResource == nil {
 					targetResource = resource.DeepCopy()
 					targetResource.Group = group
@@ -290,26 +316,28 @@ func (r *ReconcileComposable) LookupAPIResource(key, targetVersion string, cache
 		}
 	}
 	if len(matchedResources) > 1 {
-		return nil, fmt.Errorf("Multiple resources are matched by %q: %s. A group-qualified plural name must be provided.", key, strings.Join(matchedResources, ", "))
+		return nil, fmt.Errorf("Multiple resources are matched by %q: %s. A group-qualified plural name must be provided.", kind, strings.Join(matchedResources, ", "))
 	}
 
 	if targetResource != nil {
 		return targetResource, nil
 	}
 
-	return nil, fmt.Errorf("Unable to find api resource named %q.", key)
+	return nil, fmt.Errorf("Unable to find api resource named %q.", kind)
 }
 
 func (r *ReconcileComposable) resolveValue(value interface{}, composableNamespace string, cache *composableCache) (interface{}, error) {
+	klog.V(5).Infof(" resolve value type %T   %v\n", value, value)
 	if val, ok := value.(map[string]interface{}); ok {
 		if kind, ok := val[kind].(string); ok {
 			vers := ""
-			if vers, ok = val[version].(string); ok {
-				// TODO fix
+			if vers, ok = val[version].(string); !ok {
+				vers = ""
 			}
 			res, err := r.LookupAPIResource(kind, vers, cache)
 			if err != nil {
-				return errorToDefaultValue(val, err)
+				// If an input object API resource is not installed, we return error even if a default value is set.
+				return nil, err
 			}
 			if name, ok := val[name].(string); ok {
 				if path, ok := val[path].(string); ok {
@@ -344,9 +372,10 @@ func (r *ReconcileComposable) resolveValue(value interface{}, composableNamespac
 							unstrObj = unstructured.Unstructured{}
 							//unstrObj.SetAPIVersion(res.Version)
 							unstrObj.SetGroupVersionKind(groupVersionKind)
-							klog.V(5).Infof("Get Object %s\n", objNamespacedname)
+							klog.V(5).Infof("Get Object %s %s r type = %T\n", objNamespacedname, groupVersionKind, r.Client )
 							err = r.Get(context.TODO(), objNamespacedname, &unstrObj)
 							if err != nil {
+								klog.V(5).Infof("Get object returned %s", err.Error())
 								cache.objects[key] = toumbstone{err: err}
 								if errors.IsNotFound(err) {
 									return errorToDefaultValue(val, err)
@@ -404,12 +433,12 @@ func (r *ReconcileComposable) resolveValue(value interface{}, composableNamespac
 		}
 		return "", fmt.Errorf("Failed: getValueFrom is not well-formed, 'kind' is not defined")
 	}
-	return "", fmt.Errorf("Failed: getValueFrom is not well-formed")
+	return "", fmt.Errorf("Failed: getValueFrom is not well-formed, its value type is %T", value)
 }
 
 func errorToDefaultValue(val map[string]interface{}, err error) (interface{}, error) {
 	if defaultValue, ok := val[defaultValue]; ok {
-		klog.V(5).Infof("Return default value %v\n", defaultValue)
+		klog.V(5).Infof("Return default value %v for %+v due to %s \n", defaultValue, val, err.Error())
 		return defaultValue, nil
 	}
 	return nil, err

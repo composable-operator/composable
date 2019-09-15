@@ -6,65 +6,72 @@ package lsp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"golang.org/x/tools/internal/lsp/protocol"
 	"golang.org/x/tools/internal/lsp/source"
 	"golang.org/x/tools/internal/span"
+	"golang.org/x/tools/internal/telemetry/log"
 )
 
-func (s *Server) hover(ctx context.Context, params *protocol.TextDocumentPositionParams) (*protocol.Hover, error) {
+func (s *Server) hover(ctx context.Context, params *protocol.HoverParams) (*protocol.Hover, error) {
 	uri := span.NewURI(params.TextDocument.URI)
-	view := s.findView(ctx, uri)
-	f, m, err := newColumnMap(ctx, view, uri)
+	view := s.session.ViewOf(uri)
+	f, err := getGoFile(ctx, view, uri)
 	if err != nil {
 		return nil, err
 	}
-	spn, err := m.PointSpan(params.Position)
+	ident, err := source.Identifier(ctx, view, f, params.Position)
+	if err != nil {
+		return nil, nil
+	}
+	hover, err := ident.Hover(ctx)
 	if err != nil {
 		return nil, err
 	}
-	identRange, err := spn.Range(m.Converter)
+	rng, err := ident.Range()
 	if err != nil {
 		return nil, err
 	}
-	ident, err := source.Identifier(ctx, view, f, identRange.Start)
-	if err != nil {
-		return nil, err
-	}
-	hover, err := ident.Hover(ctx, nil, s.enhancedHover, s.preferredContentFormat == protocol.Markdown)
-	if err != nil {
-		return nil, err
-	}
-	identSpan, err := ident.Range.Span()
-	if err != nil {
-		return nil, err
-	}
-	rng, err := m.Range(identSpan)
-	if err != nil {
-		return nil, err
-	}
+	contents := s.toProtocolHoverContents(ctx, hover, view.Options())
 	return &protocol.Hover{
-		Contents: protocol.MarkupContent{
-			Kind:  s.preferredContentFormat,
-			Value: hover,
-		},
-		Range: &rng,
+		Contents: contents,
+		Range:    &rng,
 	}, nil
 }
 
-func markupContent(decl, doc string, kind protocol.MarkupKind) protocol.MarkupContent {
-	result := protocol.MarkupContent{
-		Kind: kind,
+func (s *Server) toProtocolHoverContents(ctx context.Context, h *source.HoverInformation, options source.Options) protocol.MarkupContent {
+	content := protocol.MarkupContent{
+		Kind: options.PreferredContentFormat,
 	}
-	switch kind {
-	case protocol.PlainText:
-		result.Value = decl
-	case protocol.Markdown:
-		result.Value = "```go\n" + decl + "\n```"
+	signature := h.Signature
+	if content.Kind == protocol.Markdown {
+		signature = fmt.Sprintf("```go\n%s\n```", h.Signature)
 	}
-	if doc != "" {
-		result.Value = fmt.Sprintf("%s\n%s", doc, result.Value)
+	switch options.HoverKind {
+	case source.SingleLine:
+		content.Value = h.SingleLine
+	case source.NoDocumentation:
+		content.Value = signature
+	case source.SynopsisDocumentation:
+		if h.Synopsis != "" {
+			content.Value = fmt.Sprintf("%s\n%s", h.Synopsis, signature)
+		} else {
+			content.Value = signature
+		}
+	case source.FullDocumentation:
+		if h.FullDocumentation != "" {
+			content.Value = fmt.Sprintf("%s\n%s", signature, h.FullDocumentation)
+		} else {
+			content.Value = signature
+		}
+	case source.Structured:
+		b, err := json.Marshal(h)
+		if err != nil {
+			log.Error(ctx, "failed to marshal structured hover", err)
+		}
+		content.Value = string(b)
 	}
-	return result
+	return content
 }

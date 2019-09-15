@@ -6,84 +6,141 @@ package source
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"go/ast"
 	"go/printer"
 	"go/types"
 	"strings"
 
+	"golang.org/x/tools/internal/lsp/protocol"
 	"golang.org/x/tools/internal/lsp/snippet"
+	"golang.org/x/tools/internal/span"
+	"golang.org/x/tools/internal/telemetry/log"
+	"golang.org/x/tools/internal/telemetry/tag"
 )
 
-// formatCompletion creates a completion item for a given types.Object.
-func (c *completer) item(obj types.Object, score float64) CompletionItem {
+// formatCompletion creates a completion item for a given candidate.
+func (c *completer) item(cand candidate) (CompletionItem, error) {
+	obj := cand.obj
+
 	// Handle builtin types separately.
 	if obj.Parent() == types.Universe {
-		return c.formatBuiltin(obj, score)
+		return c.formatBuiltin(cand), nil
 	}
 
 	var (
-		label              = obj.Name()
-		detail             = types.TypeString(obj.Type(), c.qf)
-		insert             = label
-		kind               CompletionItemKind
-		plainSnippet       *snippet.Builder
-		placeholderSnippet *snippet.Builder
+		label         = cand.name
+		detail        = types.TypeString(obj.Type(), c.qf)
+		insert        = label
+		kind          CompletionItemKind
+		snip          *snippet.Builder
+		protocolEdits []protocol.TextEdit
 	)
 
-	switch o := obj.(type) {
+	// expandFuncCall mutates the completion label, detail, and snippet
+	// to that of an invocation of sig.
+	expandFuncCall := func(sig *types.Signature) {
+		params := formatParams(sig.Params(), sig.Variadic(), c.qf)
+		snip = c.functionCallSnippet(label, params)
+		results, writeParens := formatResults(sig.Results(), c.qf)
+		detail = "func" + formatFunction(params, results, writeParens)
+	}
+
+	switch obj := obj.(type) {
 	case *types.TypeName:
-		detail, kind = formatType(o.Type(), c.qf)
+		detail, kind = formatType(obj.Type(), c.qf)
 	case *types.Const:
-		if obj.Parent() == types.Universe {
-			detail = ""
-		} else {
-			val := o.Val().ExactString()
-			if !strings.ContainsRune(val, '\n') { // skip any multiline constants
-				label += " = " + val
-			}
-		}
 		kind = ConstantCompletionItem
 	case *types.Var:
-		if _, ok := o.Type().(*types.Struct); ok {
+		if _, ok := obj.Type().(*types.Struct); ok {
 			detail = "struct{...}" // for anonymous structs
 		}
-		if o.IsField() {
+		if obj.IsField() {
 			kind = FieldCompletionItem
-			plainSnippet, placeholderSnippet = c.structFieldSnippets(label, detail)
-		} else if c.isParameter(o) {
+			snip = c.structFieldSnippet(label, detail)
+		} else if c.isParameter(obj) {
 			kind = ParameterCompletionItem
 		} else {
 			kind = VariableCompletionItem
 		}
+
+		if sig, ok := obj.Type().Underlying().(*types.Signature); ok && cand.expandFuncCall {
+			expandFuncCall(sig)
+		}
 	case *types.Func:
-		sig, ok := o.Type().(*types.Signature)
+		sig, ok := obj.Type().Underlying().(*types.Signature)
 		if !ok {
 			break
 		}
-		params := formatParams(sig.Params(), sig.Variadic(), c.qf)
-		results, writeParens := formatResults(sig.Results(), c.qf)
-		label, detail = formatFunction(obj.Name(), params, results, writeParens)
-		plainSnippet, placeholderSnippet = c.functionCallSnippets(obj.Name(), params)
 		kind = FunctionCompletionItem
-		if sig.Recv() != nil {
+		if sig != nil && sig.Recv() != nil {
 			kind = MethodCompletionItem
+		}
+
+		if cand.expandFuncCall {
+			expandFuncCall(sig)
 		}
 	case *types.PkgName:
 		kind = PackageCompletionItem
-		detail = fmt.Sprintf("\"%s\"", o.Imported().Path())
+		detail = fmt.Sprintf("%q", obj.Imported().Path())
 	}
-	detail = strings.TrimPrefix(detail, "untyped ")
 
-	return CompletionItem{
-		Label:              label,
-		InsertText:         insert,
-		Detail:             detail,
-		Kind:               kind,
-		Score:              score,
-		Snippet:            plainSnippet,
-		PlaceholderSnippet: placeholderSnippet,
+	// If this candidate needs an additional import statement,
+	// add the additional text edits needed.
+	if cand.imp != nil {
+		edit, err := addNamedImport(c.view.Session().Cache().FileSet(), c.file, cand.imp.Name, cand.imp.ImportPath)
+		if err != nil {
+			return CompletionItem{}, err
+		}
+		addlEdits, err := ToProtocolEdits(c.mapper, edit)
+		if err != nil {
+			return CompletionItem{}, err
+		}
+		protocolEdits = append(protocolEdits, addlEdits...)
 	}
+
+	detail = strings.TrimPrefix(detail, "untyped ")
+	item := CompletionItem{
+		Label:               label,
+		InsertText:          insert,
+		AdditionalTextEdits: protocolEdits,
+		Detail:              detail,
+		Kind:                kind,
+		Score:               cand.score,
+		Depth:               len(c.deepState.chain),
+		snippet:             snip,
+	}
+	// If the user doesn't want documentation for completion items.
+	if !c.opts.Documentation {
+		return item, nil
+	}
+	pos := c.view.Session().Cache().FileSet().Position(obj.Pos())
+
+	// We ignore errors here, because some types, like "unsafe" or "error",
+	// may not have valid positions that we can use to get documentation.
+	if !pos.IsValid() {
+		return item, nil
+	}
+
+	uri := span.FileURI(pos.Filename)
+	_, file, pkg, err := c.pkg.FindFile(c.ctx, uri, obj.Pos())
+	if err != nil {
+		return CompletionItem{}, err
+	}
+	ident, err := findIdentifier(c.ctx, c.view, []Package{pkg}, file, obj.Pos())
+	if err != nil {
+		return CompletionItem{}, err
+	}
+	hover, err := ident.Hover(c.ctx)
+	if err != nil {
+		return CompletionItem{}, err
+	}
+	item.Documentation = hover.Synopsis
+	if c.opts.FullDocumentation {
+		item.Documentation = hover.FullDocumentation
+	}
+	return item, nil
 }
 
 // isParameter returns true if the given *types.Var is a parameter
@@ -100,33 +157,27 @@ func (c *completer) isParameter(v *types.Var) bool {
 	return false
 }
 
-func (c *completer) formatBuiltin(obj types.Object, score float64) CompletionItem {
+func (c *completer) formatBuiltin(cand candidate) CompletionItem {
+	obj := cand.obj
 	item := CompletionItem{
 		Label:      obj.Name(),
 		InsertText: obj.Name(),
-		Score:      score,
+		Score:      cand.score,
 	}
 	switch obj.(type) {
 	case *types.Const:
 		item.Kind = ConstantCompletionItem
 	case *types.Builtin:
 		item.Kind = FunctionCompletionItem
-		builtinPkg := c.view.BuiltinPackage()
-		if builtinPkg == nil || builtinPkg.Scope == nil {
-			break
-		}
-		fn := builtinPkg.Scope.Lookup(obj.Name())
-		if fn == nil {
-			break
-		}
-		decl, ok := fn.Decl.(*ast.FuncDecl)
+		decl, ok := lookupBuiltinDecl(c.view, obj.Name()).(*ast.FuncDecl)
 		if !ok {
 			break
 		}
-		params, _ := c.formatFieldList(decl.Type.Params)
-		results, writeResultParens := c.formatFieldList(decl.Type.Results)
-		item.Label, item.Detail = formatFunction(obj.Name(), params, results, writeResultParens)
-		item.Snippet, item.PlaceholderSnippet = c.functionCallSnippets(obj.Name(), params)
+		params, _ := formatFieldList(c.ctx, c.view, decl.Type.Params)
+		results, writeResultParens := formatFieldList(c.ctx, c.view, decl.Type.Results)
+		item.Label = obj.Name()
+		item.Detail = "func" + formatFunction(params, results, writeResultParens)
+		item.snippet = c.functionCallSnippet(obj.Name(), params)
 	case *types.TypeName:
 		if types.IsInterface(obj.Type()) {
 			item.Kind = InterfaceCompletionItem
@@ -145,7 +196,7 @@ var replacer = strings.NewReplacer(
 	`IntegerType`, `int`,
 )
 
-func (c *completer) formatFieldList(list *ast.FieldList) ([]string, bool) {
+func formatFieldList(ctx context.Context, v View, list *ast.FieldList) ([]string, bool) {
 	if list == nil {
 		return nil, false
 	}
@@ -158,8 +209,8 @@ func (c *completer) formatFieldList(list *ast.FieldList) ([]string, bool) {
 		p := list.List[i]
 		cfg := printer.Config{Mode: printer.UseSpaces | printer.TabIndent, Tabwidth: 4}
 		b := &bytes.Buffer{}
-		if err := cfg.Fprint(b, c.view.FileSet(), p.Type); err != nil {
-			c.view.Logger().Errorf(c.ctx, "unable to print type %v", p.Type)
+		if err := cfg.Fprint(b, v.Session().Cache().FileSet(), p.Type); err != nil {
+			log.Error(ctx, "unable to print type", nil, tag.Of("Type", p.Type))
 			continue
 		}
 		typ := replacer.Replace(b.String())
@@ -190,6 +241,7 @@ func qualifier(f *ast.File, pkg *types.Package, info *types.Info) types.Qualifie
 		if imp.Name != nil {
 			obj = info.Defs[imp.Name]
 		} else {
+
 			obj = info.Implicits[imp]
 		}
 		if pkgname, ok := obj.(*types.PkgName); ok {

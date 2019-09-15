@@ -1,5 +1,162 @@
 # Changes
 
+## v0.45.1
+
+This is an empty release that was created solely to aid in pubsub's module
+carve-out. See: https://github.com/golang/go/wiki/Modules#is-it-possible-to-add-a-module-to-a-multi-module-repository.
+
+## v0.45.0
+
+- compute/metadata:
+  - Add Email method.
+- storage:
+  - Fix duplicated retry logic.
+  - Add ReaderObjectAttrs.StartOffset.
+  - Support reading last N bytes of a file when a negative range is given, such
+    as `obj.NewRangeReader(ctx, -10, -1)`.
+  - Add HMACKey listing functionality.
+- spanner/spannertest:
+  - Support primary keys with no columns.
+  - Fix MinInt64 parsing.
+  - Implement deletion of key ranges.
+  - Handle reads during a read-write transaction.
+  - Handle returning DATE values.
+- pubsub:
+  - Fix Ack/Modack request size calculation.
+- logging:
+  - Add auto-detection of monitored resources on GAE Standard.
+
+## v0.44.3
+
+This is an empty release that was created solely to aid in bigtable's module
+carve-out. See: https://github.com/golang/go/wiki/Modules#is-it-possible-to-add-a-module-to-a-multi-module-repository.
+
+## v0.44.2
+
+This is an empty release that was created solely to aid in bigquery's module
+carve-out. See: https://github.com/golang/go/wiki/Modules#is-it-possible-to-add-a-module-to-a-multi-module-repository.
+
+## v0.44.1
+
+This is an empty release that was created solely to aid in datastore's module
+carve-out. See: https://github.com/golang/go/wiki/Modules#is-it-possible-to-add-a-module-to-a-multi-module-repository.
+
+## v0.44.0
+
+- datastore:
+  - Interface elements whose underlying types are supported, are now supported.
+  - Reduce time to initial retry from 1s to 100ms.
+- firestore:
+  - Add Increment transformation.
+- storage:
+  - Allow emulator with STORAGE_EMULATOR_HOST.
+  - Add methods for HMAC key management.
+- pubsub:
+  - Add PublishCount and PublishLatency measurements.
+  - Add DefaultPublishViews and DefaultSubscribeViews for convenience of
+  importing all views.
+  - Add add Subscription.PushConfig.AuthenticationMethod.
+- spanner:
+  - Allow emulator usage with SPANNER_EMULATOR_HOST.
+  - Add cloud.google.com/go/spanner/spannertest, a spanner emulator.
+  - Add cloud.google.com/go/spanner/spansql which contains types and a parser
+  for the Cloud Spanner SQL dialect.
+- asset:
+  - Add apiv1p2beta1 client.
+
+## v0.43.0
+
+This is an empty release that was created solely to aid in logging's module
+carve-out. See: https://github.com/golang/go/wiki/Modules#is-it-possible-to-add-a-module-to-a-multi-module-repository.
+
+## v0.42.0
+
+- bigtable:
+  - Add an admin method to update an instance and clusters.
+  - Fix bttest regex matching behavior for alternations (things like `|a`).
+  - Expose BlockAllFilter filter.
+- bigquery:
+  - Add Routines API support.
+- storage:
+  - Add read-only Bucket.LocationType.
+- logging:
+  - Add TraceSampled to Entry.
+  - Fix to properly extract {Trace, Span}Id from X-Cloud-Trace-Context.
+- pubsub:
+  - Add Cloud Key Management to TopicConfig.
+  - Change ExpirationPolicy to optional.Duration.
+- automl:
+  - Add apiv1beta1 client.
+- iam:
+  - Fix compilation problem with iam/credentials/apiv1.
+
+## v0.41.0
+
+- bigtable:
+  - Check results from PredicateFilter in bttest, which fixes certain false matches.
+- profiler:
+  - debugLog checks user defined logging options before logging.
+- spanner:
+  - PartitionedUpdates respect query parameters.
+  - StartInstance allows specifying cloud API access scopes.
+- bigquery:
+  - Use empty slice instead of nil for ValueSaver, fixing an issue with zero-length, repeated, nested fields causing panics.
+- firestore:
+  - Return same number of snapshots as doc refs (in the form of duplicate records) during GetAll.
+- replay:
+  - Change references to IPv4 addresses to localhost, making replay compatible with IPv6.
+
+## v0.40.0
+
+- all:
+  - Update to protobuf-golang v1.3.1.
+- datastore:
+  - Attempt to decode GAE-encoded keys if initial decoding attempt fails.
+  - Support integer time conversion.
+- pubsub:
+  - Add PublishSettings.BundlerByteLimit. If users receive pubsub.ErrOverflow,
+  this value should be adjusted higher.
+  - Use IPv6 compatible target in testutil.
+- bigtable:
+  - Fix Latin-1 regexp filters in bttest, allowing \C.
+  - Expose PassAllFilter.
+- profiler:
+  - Add log messages for slow path in start.
+  - Fix start to allow retry until success.
+- firestore:
+  - Add admin client.
+- containeranalysis:
+  - Add apiv1 client.
+- grafeas:
+  - Add apiv1 client.
+
+## 0.39.0
+
+- bigtable:
+  - Implement DeleteInstance in bttest.
+  - Return an error on invalid ReadRowsRequest.RowRange key ranges in bttest.
+- bigquery:
+  - Move RequirePartitionFilter outside of TimePartioning.
+  - Expose models API.
+- firestore:
+  - Allow array values in create and update calls.
+  - Add CollectionGroup method.
+- pubsub:
+  - Add ExpirationPolicy to Subscription.
+- storage:
+  - Add V4 signing.
+- rpcreplay:
+  - Match streams by first sent request. This further improves rpcreplay's
+  ability to distinguish streams.
+- httpreplay:
+  - Set up Man-In-The-Middle config only once. This should improve proxy
+  creation when multiple proxies are used in a single process.
+  - Remove error on empty Content-Type, allowing requests with no Content-Type
+  header but a non-empty body.
+- all:
+  - Fix an edge case bug in auto-generated library pagination by properly
+  propagating pagetoken.
+
 ## 0.38.0
 
 This update includes a substantial reduction in our transitive dependency list
