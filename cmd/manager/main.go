@@ -53,19 +53,13 @@ func main() {
 	if flag.Lookup("kubeconfig") == nil {
 		flag.String("kubeconfig", os.Getenv("KUBECONFIG"), "Path to a kube config. Only required if out-of-cluster.")
 	}
-	syncPeriod := flag.Duration("syncPeriod", 30*time.Second, "Defines the minimum frequency at which watched Compsable resources are reconciled.")
+	syncPeriod := flag.Duration("syncPeriod", 30*time.Second, "Defines the minimum frequency at which watched Composable resources are reconciled.")
 	flag.Parse()
 	// build config for the  cluster
 	cfg, err := BuildConfig(kubeconfig)
 	if err != nil {
 		klog.Fatalf("BuildConfig returned error: %q", err.Error())
 	}
-
-	// Get a config to talk to the apiserver
-	//cfg, err := config.GetConfig()
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
 
 	// Create a new Cmd to provide shared dependencies and start components
 	mgr, err := manager.New(cfg, manager.Options{SyncPeriod: syncPeriod})

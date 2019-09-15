@@ -49,6 +49,8 @@ func defaultClusterControllerClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		option.WithEndpoint("dataproc.googleapis.com:443"),
 		option.WithScopes(DefaultAuthScopes()...),
+		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
 	}
 }
 
@@ -265,6 +267,7 @@ func (c *ClusterControllerClient) ListClusters(ctx context.Context, req *datapro
 	}
 	it.pageInfo, it.nextFunc = iterator.NewPageInfo(fetch, it.bufLen, it.takeBuf)
 	it.pageInfo.MaxSize = int(req.PageSize)
+	it.pageInfo.Token = req.PageToken
 	return it
 }
 

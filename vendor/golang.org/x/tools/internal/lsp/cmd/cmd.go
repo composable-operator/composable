@@ -11,8 +11,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"go/ast"
-	"go/parser"
 	"go/token"
 	"io/ioutil"
 	"log"
@@ -21,12 +19,17 @@ import (
 	"strings"
 	"sync"
 
-	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/internal/jsonrpc2"
 	"golang.org/x/tools/internal/lsp"
+	"golang.org/x/tools/internal/lsp/cache"
 	"golang.org/x/tools/internal/lsp/protocol"
+	"golang.org/x/tools/internal/lsp/source"
 	"golang.org/x/tools/internal/span"
+	"golang.org/x/tools/internal/telemetry/export"
+	"golang.org/x/tools/internal/telemetry/export/ocagent"
 	"golang.org/x/tools/internal/tool"
+	"golang.org/x/tools/internal/xcontext"
+	errors "golang.org/x/xerrors"
 )
 
 // Application is the main application as passed to tool.Main
@@ -42,18 +45,45 @@ type Application struct {
 	// TODO: Remove this when we stop allowing the serve verb by default.
 	Serve Serve
 
-	// An initial, common go/packages configuration
-	Config packages.Config
+	// The base cache to use for sessions from this application.
+	cache source.Cache
+
+	// The name of the binary, used in help and telemetry.
+	name string
+
+	// The working directory to run commands in.
+	wd string
+
+	// The environment variables to use.
+	env []string
 
 	// Support for remote lsp server
 	Remote string `flag:"remote" help:"*EXPERIMENTAL* - forward all commands to a remote lsp"`
 
 	// Enable verbose logging
 	Verbose bool `flag:"v" help:"Verbose output"`
+
+	// Control ocagent export of telemetry
+	OCAgent string `flag:"ocagent" help:"The address of the ocagent, or off"`
+}
+
+// Returns a new Application ready to run.
+func New(name, wd string, env []string) *Application {
+	if wd == "" {
+		wd, _ = os.Getwd()
+	}
+	app := &Application{
+		cache:   cache.New(),
+		name:    name,
+		wd:      wd,
+		env:     env,
+		OCAgent: "off", //TODO: Remove this line to default the exporter to on
+	}
+	return app
 }
 
 // Name implements tool.Application returning the binary name.
-func (app *Application) Name() string { return "gopls" }
+func (app *Application) Name() string { return app.name }
 
 // Usage implements tool.Application returning empty extra argument usage.
 func (app *Application) Usage() string { return "<command> [command-flags] [command-args]" }
@@ -83,24 +113,14 @@ gopls flags are:
 // If no arguments are passed it will invoke the server sub command, as a
 // temporary measure for compatibility.
 func (app *Application) Run(ctx context.Context, args ...string) error {
+	ocConfig := ocagent.Discover()
+	//TODO: we should not need to adjust the discovered configuration
+	ocConfig.Address = app.OCAgent
+	export.AddExporters(ocagent.Connect(ocConfig))
 	app.Serve.app = app
 	if len(args) == 0 {
 		tool.Main(ctx, &app.Serve, args)
 		return nil
-	}
-	if app.Config.Dir == "" {
-		if wd, err := os.Getwd(); err == nil {
-			app.Config.Dir = wd
-		}
-	}
-	app.Config.Mode = packages.LoadSyntax
-	app.Config.Tests = true
-	if app.Config.Fset == nil {
-		app.Config.Fset = token.NewFileSet()
-	}
-	app.Config.Context = ctx
-	app.Config.ParseFile = func(fset *token.FileSet, filename string, src []byte) (*ast.File, error) {
-		return parser.ParseFile(fset, filename, src, parser.AllErrors|parser.ParseComments)
 	}
 	command, args := args[0], args[1:]
 	for _, c := range app.commands() {
@@ -135,26 +155,29 @@ func (app *Application) connect(ctx context.Context) (*connection, error) {
 	switch app.Remote {
 	case "":
 		connection := newConnection(app)
-		connection.Server = lsp.NewClientServer(connection.Client)
+		ctx, connection.Server = lsp.NewClientServer(ctx, app.cache, connection.Client)
 		return connection, connection.initialize(ctx)
 	case "internal":
 		internalMu.Lock()
 		defer internalMu.Unlock()
-		if c := internalConnections[app.Config.Dir]; c != nil {
+		if c := internalConnections[app.wd]; c != nil {
 			return c, nil
 		}
 		connection := newConnection(app)
-		ctx := context.Background() //TODO:a way of shutting down the internal server
+		ctx := xcontext.Detach(ctx) //TODO:a way of shutting down the internal server
 		cr, sw, _ := os.Pipe()
 		sr, cw, _ := os.Pipe()
 		var jc *jsonrpc2.Conn
-		jc, connection.Server, _ = protocol.NewClient(jsonrpc2.NewHeaderStream(cr, cw), connection.Client)
+		ctx, jc, connection.Server = protocol.NewClient(ctx, jsonrpc2.NewHeaderStream(cr, cw), connection.Client)
 		go jc.Run(ctx)
-		go lsp.NewServer(jsonrpc2.NewHeaderStream(sr, sw)).Run(ctx)
+		go func() {
+			ctx, srv := lsp.NewServer(ctx, app.cache, jsonrpc2.NewHeaderStream(sr, sw))
+			srv.Run(ctx)
+		}()
 		if err := connection.initialize(ctx); err != nil {
 			return nil, err
 		}
-		internalConnections[app.Config.Dir] = connection
+		internalConnections[app.wd] = connection
 		return connection, nil
 	default:
 		connection := newConnection(app)
@@ -164,15 +187,15 @@ func (app *Application) connect(ctx context.Context) (*connection, error) {
 		}
 		stream := jsonrpc2.NewHeaderStream(conn, conn)
 		var jc *jsonrpc2.Conn
-		jc, connection.Server, _ = protocol.NewClient(stream, connection.Client)
+		ctx, jc, connection.Server = protocol.NewClient(ctx, stream, connection.Client)
 		go jc.Run(ctx)
 		return connection, connection.initialize(ctx)
 	}
 }
 
 func (c *connection) initialize(ctx context.Context) error {
-	params := &protocol.InitializeParams{}
-	params.RootURI = string(span.FileURI(c.Client.app.Config.Dir))
+	params := &protocol.ParamInitia{}
+	params.RootURI = string(span.FileURI(c.Client.app.wd))
 	params.Capabilities.Workspace.Configuration = true
 	params.Capabilities.TextDocument.Hover.ContentFormat = []protocol.MarkupKind{protocol.PlainText}
 	if _, err := c.Server.Initialize(ctx, params); err != nil {
@@ -204,6 +227,7 @@ type cmdFile struct {
 	err            error
 	added          bool
 	hasDiagnostics chan struct{}
+	diagnosticsMu  sync.Mutex
 	diagnostics    []protocol.Diagnostic
 }
 
@@ -259,21 +283,23 @@ func (c *cmdClient) WorkspaceFolders(ctx context.Context) ([]protocol.WorkspaceF
 	return nil, nil
 }
 
-func (c *cmdClient) Configuration(ctx context.Context, p *protocol.ConfigurationParams) ([]interface{}, error) {
+func (c *cmdClient) Configuration(ctx context.Context, p *protocol.ParamConfig) ([]interface{}, error) {
 	results := make([]interface{}, len(p.Items))
 	for i, item := range p.Items {
 		if item.Section != "gopls" {
 			continue
 		}
 		env := map[string]interface{}{}
-		for _, value := range c.app.Config.Env {
+		for _, value := range c.app.env {
 			l := strings.SplitN(value, "=", 2)
 			if len(l) != 2 {
 				continue
 			}
 			env[l[0]] = l[1]
 		}
-		results[i] = map[string]interface{}{"env": env}
+		results[i] = map[string]interface{}{
+			"env": env,
+		}
 	}
 	return results, nil
 }
@@ -287,6 +313,8 @@ func (c *cmdClient) PublishDiagnostics(ctx context.Context, p *protocol.PublishD
 	defer c.filesMu.Unlock()
 	uri := span.URI(p.URI)
 	file := c.getFile(ctx, uri)
+	file.diagnosticsMu.Lock()
+	defer file.diagnosticsMu.Unlock()
 	hadDiagnostics := file.diagnostics != nil
 	file.diagnostics = p.Diagnostics
 	if file.diagnostics == nil {
@@ -300,7 +328,7 @@ func (c *cmdClient) PublishDiagnostics(ctx context.Context, p *protocol.PublishD
 
 func (c *cmdClient) getFile(ctx context.Context, uri span.URI) *cmdFile {
 	file, found := c.files[uri]
-	if !found {
+	if !found || file.err != nil {
 		file = &cmdFile{
 			uri:            uri,
 			hasDiagnostics: make(chan struct{}),
@@ -308,19 +336,15 @@ func (c *cmdClient) getFile(ctx context.Context, uri span.URI) *cmdFile {
 		c.files[uri] = file
 	}
 	if file.mapper == nil {
-		fname, err := uri.Filename()
-		if err != nil {
-			file.err = fmt.Errorf("%v: %v", uri, err)
-			return file
-		}
+		fname := uri.Filename()
 		content, err := ioutil.ReadFile(fname)
 		if err != nil {
-			file.err = fmt.Errorf("%v: %v", uri, err)
+			file.err = errors.Errorf("getFile: %v: %v", uri, err)
 			return file
 		}
 		f := c.fset.AddFile(fname, -1, len(content))
 		f.SetLinesForContent(content)
-		file.mapper = protocol.NewColumnMapper(uri, c.fset, f, content)
+		file.mapper = protocol.NewColumnMapper(uri, fname, c.fset, f, content)
 	}
 	return file
 }
@@ -328,15 +352,36 @@ func (c *cmdClient) getFile(ctx context.Context, uri span.URI) *cmdFile {
 func (c *connection) AddFile(ctx context.Context, uri span.URI) *cmdFile {
 	c.Client.filesMu.Lock()
 	defer c.Client.filesMu.Unlock()
+
 	file := c.Client.getFile(ctx, uri)
-	if !file.added {
-		file.added = true
-		p := &protocol.DidOpenTextDocumentParams{}
-		p.TextDocument.URI = string(uri)
-		p.TextDocument.Text = string(file.mapper.Content)
-		if err := c.Server.DidOpen(ctx, p); err != nil {
-			file.err = fmt.Errorf("%v: %v", uri, err)
+	// This should never happen.
+	if file == nil {
+		return &cmdFile{
+			uri: uri,
+			err: fmt.Errorf("no file found for %s", uri),
 		}
 	}
+	if file.err != nil || file.added {
+		return file
+	}
+	file.added = true
+	p := &protocol.DidOpenTextDocumentParams{}
+	p.TextDocument.URI = string(uri)
+	p.TextDocument.Text = string(file.mapper.Content)
+	p.TextDocument.LanguageID = source.DetectLanguage("", file.uri.Filename()).String()
+	if err := c.Server.DidOpen(ctx, p); err != nil {
+		file.err = errors.Errorf("%v: %v", uri, err)
+	}
 	return file
+}
+
+func (c *connection) terminate(ctx context.Context) {
+	if c.Client.app.Remote == "internal" {
+		// internal connections need to be left alive for the next test
+		return
+	}
+	//TODO: do we need to handle errors on these calls?
+	c.Shutdown(ctx)
+	//TODO: right now calling exit terminates the process, we should rethink that
+	//server.Exit(ctx)
 }

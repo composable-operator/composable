@@ -23,6 +23,7 @@ enum FieldKind {
     MAP = 1;
     ARRAY = 2;
     REFERENCE = 3;
+    ANY = 4;
 }
 
 enum TypeKind {
@@ -87,4 +88,5 @@ message Model {
     string name = 1; // a free-form title for the API
     repeated Type types = 2; // the types used by the API
     repeated Method methods = 3; // the methods (functions) of the API
+    repeated string symbolic_references = 4; // references to other OpenAPI files. Currently only supported for OpenAPI v3.
 }
