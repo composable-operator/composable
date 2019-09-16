@@ -51,7 +51,7 @@ const (
 	namespace      = "namespace"
 	metadata       = "metadata"
 	kind           = "kind"
-	version        = "version"
+	group          = "group"
 	spec           = "spec"
 	status         = "status"
 	state          = "state"
@@ -240,15 +240,25 @@ func (r *ReconcileComposable) GetServerPreferredResources() ([]*metav1.APIResour
 }
 
 
-func NameMatchesResource(name string, apiResource metav1.APIResource, group string) bool {
+func NameMatchesResource(name string, objGroup string, resource metav1.APIResource, resGroup string) bool {
 	lowerCaseName := strings.ToLower(name)
-	if lowerCaseName == apiResource.Name ||
-		lowerCaseName == apiResource.SingularName ||
-		lowerCaseName == strings.ToLower(apiResource.Kind) ||
-		lowerCaseName == fmt.Sprintf("%s.%s", apiResource.Name, group) {
+	if len(objGroup) > 0 {
+		 if objGroup == resGroup &&
+		    ( lowerCaseName ==  resource.Name ||
+			lowerCaseName == resource.SingularName ||
+			lowerCaseName == strings.ToLower(resource.Kind) ) {
+			 return true
+		 } else {
+		 	return false
+		 }
+	}
+	if lowerCaseName == resource.Name ||
+		lowerCaseName == resource.SingularName ||
+		lowerCaseName == strings.ToLower(resource.Kind) ||
+		lowerCaseName == fmt.Sprintf("%s.%s", resource.Name, resGroup) {
 		return true
 	}
-	for _, shortName := range apiResource.ShortNames {
+	for _, shortName := range resource.ShortNames {
 		if lowerCaseName == strings.ToLower(shortName) {
 			return true
 		}
@@ -272,17 +282,21 @@ func GroupQualifiedName(apiResource metav1.APIResource) string {
 	return fmt.Sprintf("%s.%s", apiResource.Name, apiResource.Group)
 }
 
-func (r *ReconcileComposable) LookupAPIResource(kind, apiVersion string, cache *composableCache) (*metav1.APIResource, error) {
-
+func (r *ReconcileComposable) LookupAPIResource(objKind, objGroup string, cache *composableCache) (*metav1.APIResource, error) {
 	var resources []*metav1.APIResourceList
-	if len(apiVersion) > 0  {
-		// TODO comment it out
-		res, err := r.discoveryClient.ServerResourcesForGroupVersion(apiVersion)
-		if err != nil {
-			return nil, err
-		}
-		resources = []*metav1.APIResourceList{res}
-	} else {
+	//if len(apiVersion) > 0  {
+		//if cache.resourceMap == nil {
+		//	res, err := r.discoveryClient.ServerResourcesForGroupVersion(apiVersion)
+		//	if err != nil {
+		//		fmt.Printf(" apiVersion error %s\n", err)
+		//		return nil, err
+		//	}
+		//	cache.resourceMap = make(map[string]*metav1.APIResourceList)
+		//	cache.resourceMap[apiVersion] = res
+		//}
+		//resources = []*metav1.APIResourceList{cache.resourceMap[apiVersion]}
+		//fmt.Printf(" apiVersion2 %s %v \n", apiVersion, resources)
+	//} else {
 		if cache.resources == nil {
 			klog.V(6).Infoln("Resources is nil")
 			resourceList, err := r.GetServerPreferredResources()
@@ -292,10 +306,12 @@ func (r *ReconcileComposable) LookupAPIResource(kind, apiVersion string, cache *
 			cache.resources = resourceList
 		}
 		resources = cache.resources
-	}
+//	}
 
 	var targetResource *metav1.APIResource
 	var matchedResources []string
+	coreGroupObject := false
+	Loop:
 	for _, resourceList := range resources {
 		// The list holds the GroupVersion for its list of APIResources
 		gv, err := schema.ParseGroupVersion(resourceList.GroupVersion)
@@ -305,7 +321,16 @@ func (r *ReconcileComposable) LookupAPIResource(kind, apiVersion string, cache *
 
 		for _, resource := range resourceList.APIResources {
 			group := gv.Group
-			if NameMatchesResource(kind, resource, group) {
+			if NameMatchesResource(objKind, objGroup, resource, group) {
+				if len(group) == 0 && len(objGroup) == 0 {
+					// K8s core group object
+					coreGroupObject = true
+					targetResource = resource.DeepCopy()
+					targetResource.Group = group
+					targetResource.Version = gv.Version
+					coreGroupObject = true
+					break Loop
+				}
 				if targetResource == nil {
 					targetResource = resource.DeepCopy()
 					targetResource.Group = group
@@ -315,7 +340,7 @@ func (r *ReconcileComposable) LookupAPIResource(kind, apiVersion string, cache *
 			}
 		}
 	}
-	if len(matchedResources) > 1 {
+	if !coreGroupObject && len(matchedResources) > 1 {
 		return nil, fmt.Errorf("Multiple resources are matched by %q: %s. A group-qualified plural name must be provided.", kind, strings.Join(matchedResources, ", "))
 	}
 
@@ -327,14 +352,13 @@ func (r *ReconcileComposable) LookupAPIResource(kind, apiVersion string, cache *
 }
 
 func (r *ReconcileComposable) resolveValue(value interface{}, composableNamespace string, cache *composableCache) (interface{}, error) {
-	klog.V(5).Infof(" resolve value type %T   %v\n", value, value)
 	if val, ok := value.(map[string]interface{}); ok {
-		if kind, ok := val[kind].(string); ok {
-			vers := ""
-			if vers, ok = val[version].(string); !ok {
-				vers = ""
+		if objKind, ok := val[kind].(string); ok {
+			objGroup := ""
+			if objGroup, ok = val[group].(string); !ok {
+				objGroup = ""
 			}
-			res, err := r.LookupAPIResource(kind, vers, cache)
+			res, err := r.LookupAPIResource(objKind, objGroup, cache)
 			if err != nil {
 				// If an input object API resource is not installed, we return error even if a default value is set.
 				return nil, err
@@ -372,7 +396,6 @@ func (r *ReconcileComposable) resolveValue(value interface{}, composableNamespac
 							unstrObj = unstructured.Unstructured{}
 							//unstrObj.SetAPIVersion(res.Version)
 							unstrObj.SetGroupVersionKind(groupVersionKind)
-							klog.V(5).Infof("Get Object %s %s r type = %T\n", objNamespacedname, groupVersionKind, r.Client )
 							err = r.Get(context.TODO(), objNamespacedname, &unstrObj)
 							if err != nil {
 								klog.V(5).Infof("Get object returned %s", err.Error())

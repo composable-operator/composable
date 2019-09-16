@@ -11,14 +11,16 @@ spec:
     metadata:
       name:
         getValueFrom:
-          name: myconfigmap
           kind: ConfigMap
+          name: myconfigmap
+          namespace: default
           path: '{.data.name}'
     spec:
       instancename: 
         getValueFrom:
-          name: myconfigmap
           kind: ConfigMap
+          name: myconfigmap
+          namespace: default
           path: '{.data.name}'
 
       serviceClass: Event Streams
@@ -26,6 +28,7 @@ spec:
         getValueFrom:
           kind: Secret
           name: mysecret
+          namespace: default
           path: '{.data.plan}'
           format-transformers:
           - "Base64ToString"

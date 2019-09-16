@@ -1,0 +1,19 @@
+apiVersion: ibmcloud.ibm.com/v1alpha1
+kind: Composable
+metadata:
+  name: to-cm
+spec:
+  template:
+    apiVersion: "v1"
+    kind: ConfigMap
+    metadata:
+      name: myconfigmap
+    data:
+      servicePort:
+        getValueFrom:
+          kind: Service
+          name: myservice
+          namespace: default
+          path: '{.spec.ports[?(@.name=="http")].port}}'
+          format-transformers:
+          - ToString

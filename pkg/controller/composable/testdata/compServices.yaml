@@ -1,0 +1,30 @@
+apiVersion: ibmcloud.ibm.com/v1alpha1
+kind: Composable
+metadata:
+  name: services
+spec:
+  template: 
+    apiVersion: "test.ibmcloud.ibm.com/v1"
+    kind: OutputValue
+    metadata:
+      name: services-out
+    spec:
+      instancename: services-out
+      k8sValue:
+        getValueFrom:
+          kind: Service
+          name: test-service
+          namespace: default
+          path: '{.spec.sessionAffinity}'
+      testValue:
+        getValueFrom:
+          kind: Service
+          name: test-service
+          group: test.ibmcloud.ibm.com
+          namespace: default
+          path: '{.spec.sessionAffinity}'
+
+
+
+
+

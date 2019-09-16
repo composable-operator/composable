@@ -227,7 +227,7 @@ var _ = Describe("test Composable operations", func() {
 		unstrObj.SetGroupVersionKind(gvkIn)
 		Ω(test.GetUnstructuredObject(testContext, objNamespacednameIn, &unstrObj)()).Should(HaveOccurred())
 
-		By("check taht output object doesn't exist. If it does => remove it ") // the object should not exist, or we delete it
+		By("check that output object doesn't exist. If it does => remove it ") // the object should not exist, or we delete it
 		unstrObj.SetGroupVersionKind(gvkOut)
 		err2 := test.GetUnstructuredObject(testContext, objNamespacednameOut, &unstrObj)()
 		if err2 == nil {
@@ -299,6 +299,44 @@ var _ = Describe("test Composable operations", func() {
 		Ω(testSpec["stringJson2Value"]).Should(BeEquivalentTo(val))
 	})
 
+})
+
+var _ = Describe("Validate group separation", func() {
+	Context("There are 3 groups that have Kind = `Service`. They are: Service/v1; Service.ibmcloud.ibm.com/v1alpha1 and Service.test.ibmcloud.ibm.com/v1", func() {
+		It("Composable should correctly discover required objects", func() {
+			dataDir := "testdata/"
+
+			By("deploy K8s Service")
+			kObj := test.LoadObject(dataDir+"serviceK8s.yaml", &v1.Service{})
+			test.CreateObject(testContext, kObj, true, 0)
+			Eventually(test.GetObject(testContext, kObj)).ShouldNot(BeNil())
+
+			By("deploy test Service")
+			tObj := test.LoadObject(dataDir+"serviceTest.yaml", &unstructured.Unstructured{})
+			test.CreateObject(testContext, tObj, true, 0)
+			Eventually(test.GetObject(testContext, tObj)).ShouldNot(BeNil())
+
+			By("deploy Composable object")
+			comp := test.LoadCompasable(dataDir + "compServices.yaml")
+			test.PostInNs(testContext, &comp, true, 0)
+			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
+
+			By("get the output object and validate its fields")
+			unstrObj := unstructured.Unstructured{}
+			gvk := schema.GroupVersionKind{Kind: "OutputValue", Version: "v1", Group: "test.ibmcloud.ibm.com"}
+			objNamespacedname := types.NamespacedName{Namespace: testContext.Namespace(), Name: "services-out"}
+
+			unstrObj.SetGroupVersionKind(gvk)
+			Eventually(test.GetUnstructuredObject(testContext, objNamespacedname, &unstrObj)).Should(Succeed())
+			testSpec, ok := unstrObj.Object[spec].(map[string]interface{})
+			Ω(ok).Should(BeTrue())
+
+			Ω(testSpec["k8sValue"]).Should(Equal("None"))
+			Ω(testSpec["testValue"]).Should(Equal("Test"))
+
+		})
+
+	})
 })
 
 var _ = Describe("IBM cloud-operators compatibility", func() {

@@ -1,0 +1,7 @@
+apiVersion: test.ibmcloud.ibm.com/v1
+kind: Service
+metadata:
+  name: test-service
+  namespace: default
+spec:
+  sessionAffinity: "Test"
