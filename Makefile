@@ -1,89 +1,95 @@
--include $(shell curl -sSL -o .build-harness "https://git.io/build-harness"; echo .build-harness)
 
 # Image URL to use all building/pushing image targets
-IMG ?= cloudoperators/composable-controller
+IMG ?= controller:latest
+# Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
+CRD_OPTIONS ?= "crd:trivialVersions=true"
 
-all: test manager
+# Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
+ifeq (,$(shell go env GOBIN))
+GOBIN=$(shell go env GOPATH)/bin
+else
+GOBIN=$(shell go env GOBIN)
+endif
 
-# Install dependencies
-deps:
-	go get golang.org/x/lint/golint
-	go get -u github.com/apg/patter
-	go get -u github.com/wadey/gocovmerge
-	go get -u github.com/alecthomas/gometalinter
-	gometalinter --install
-	pip install --user PyYAML
-
+all: manager
 
 # Run tests
 test: generate fmt vet manifests
-	go test ./pkg/... ./cmd/... -coverprofile cover.out -test.v -ginkgo.slowSpecThreshold=7
+	TEST_USE_EXISTING_CLUSTER=false go test ./api/... ./controllers/... -coverprofile cover.out.tmp -test.v -ginkgo.slowSpecThreshold=7
+
+# Run tests with existing cluster
+test-existing: generate fmt vet manifests
+	TEST_USE_EXISTING_CLUSTER=true go test ./api/... ./controllers/... -coverprofile cover.out.tmp -test.v -ginkgo.slowSpecThreshold=7
 
 # Build manager binary
 manager: generate fmt vet
-	go build -o bin/manager github.com/ibm/composable/cmd/manager
+	go build -o bin/manager main.go
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
-run: generate fmt vet
-	go run ./cmd/manager/main.go
+run: generate fmt vet manifests
+	go run ./main.go
 
 # Install CRDs into a cluster
 install: manifests
-	kubectl apply -f config/crds
+	kustomize build config/crd | kubectl apply -f -
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 deploy: manifests
-	kubectl apply -f config/crds
+	cd config/manager && kustomize edit set image controller=${IMG}
 	kustomize build config/default | kubectl apply -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
-manifests:
-	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go all
+manifests: controller-gen
+	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
 # Run go fmt against code
 fmt:
-	go fmt ./pkg/... ./cmd/... ./test/...
+	go fmt ./...
 
 # Run go vet against code
 vet:
-	go vet ./pkg/... ./cmd/... ./test/...
+	go vet ./...
 
 # Generate code
-generate:
-	go generate ./pkg/... ./cmd/... ./test/...
+generate: controller-gen
+	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths="./..."
 
 # Build the docker image
+#docker-build: test
+#	docker build . -t ${IMG}
+
 docker-build: check-tag
 	docker build --no-cache . -t ${IMG}:${TAG}
 	@echo "updating kustomize image patch file for manager resource"
-	sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
+	# sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
+
 
 # Push the docker image
-docker-push: docker-build
-	echo "${DOCKER_PASSWORD}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
+docker-push:
+	docker login -u "${DOCKER_USERNAME}" -p ""${DOCKER_PASSWORD}""
 	docker push ${IMG}:${TAG}
 
 # make a release for olm and releases
 release: check-tag
 	python hack/package.py v${TAG}
 
+# find or download controller-gen
+# download controller-gen if necessary
+controller-gen:
+ifeq (, $(shell which controller-gen))
+	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.2.0
+CONTROLLER_GEN=$(GOBIN)/controller-gen
+else
+CONTROLLER_GEN=$(shell which controller-gen)
+endif
+
 .PHONY: lintall
 lintall: fmt lint vet
 
 lint:
-	golint -set_exit_status=true pkg/
+	golint -set_exit_status=false api/ controllers/
 
 check-tag:
 ifndef TAG
 	$(error TAG is undefined! Please set TAG to the latest release tag, using the format x.y.z e.g. export TAG=0.1.1 )
-endif
-
-check-quayns:
-ifndef QUAY_NS
-	$(error QUAY_NS is undefined!)
-endif
-
-check-quaytoken:
-ifndef QUAY_TOKEN
-	$(error QUAY_TOKEN is undefined!)
 endif
