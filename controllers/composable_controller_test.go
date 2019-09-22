@@ -110,7 +110,7 @@ var _ = Describe("test Composable operations", func() {
 	It("Composable should successfully set default values to the output object", func() {
 		By("Deploy Composable object")
 		comp := test.LoadCompasable(dataDir + "compCopy.yaml")
-		test.PostInNs(testContext, &comp, true, 0)
+		test.PostInNs(testContext, &comp, false, 0)
 		Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 
 		By("Get Output object")
@@ -155,7 +155,8 @@ var _ = Describe("test Composable operations", func() {
 
 		By("Deploy input Object")
 		obj := test.LoadObject(dataDir+"inputDataObject.yaml", &unstructured.Unstructured{})
-		test.CreateObject(testContext, obj, true, 0)
+		test.CreateObject(testContext, obj, false, 0)
+		Eventually(test.GetObject(testContext, obj)).ShouldNot(BeNil())
 
 		groupVersionKind := schema.GroupVersionKind{Kind: "InputValue", Version: "v1", Group: "test.ibmcloud.ibm.com"}
 		unstrObj.SetGroupVersionKind(groupVersionKind)
@@ -165,7 +166,7 @@ var _ = Describe("test Composable operations", func() {
 
 		By("Deploy Composable object")
 		comp := test.LoadCompasable(dataDir + "compCopy.yaml")
-		test.PostInNs(testContext, &comp, true, 0)
+		test.PostInNs(testContext, &comp, false, 0)
 		Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 		Eventually(test.GetState(testContext, &comp)).Should(Equal(OnlineStatus))
 
@@ -216,7 +217,7 @@ var _ = Describe("test Composable operations", func() {
 		objNamespacednameOut := types.NamespacedName{Namespace: testContext.Namespace(), Name: "comp-out"}
 
 		//unstrObj.SetGroupVersionKind(gvkOut)
-		// First, the output object is created with defult values, after that we deploy the inputObject and will check
+		// First, the output object is created with default values, after that we deploy the inputObject and will check
 		// that all Output object filed are updated.
 		By("check that input object doesn't exist") // the object should not exist
 		unstrObj.SetGroupVersionKind(gvkIn)
@@ -232,7 +233,7 @@ var _ = Describe("test Composable operations", func() {
 
 		By("deploy Composable object")
 		comp := test.LoadCompasable(dataDir + "compCopy.yaml")
-		test.PostInNs(testContext, &comp, true, 0)
+		test.PostInNs(testContext, &comp, false, 0)
 		Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 
 		By("get Output object")
@@ -250,10 +251,8 @@ var _ = Describe("test Composable operations", func() {
 
 		By("deploy input Object")
 		obj := test.LoadObject(dataDir+"inputDataObject.yaml", &unstructured.Unstructured{})
-		test.CreateObject(testContext, obj, true, 0)
-
-		unstrObj.SetGroupVersionKind(gvkIn)
-		Eventually(test.GetUnstructuredObject(testContext, objNamespacednameIn, &unstrObj)).Should(Succeed())
+		test.CreateObject(testContext, obj, false, 0)
+		Eventually(test.GetObject(testContext, obj)).ShouldNot(BeNil())
 
 		By("check updated inValue")
 		unstrObj = unstructured.Unstructured{}
@@ -302,17 +301,17 @@ var _ = Describe("Validate group separation", func() {
 
 			By("deploy K8s Service")
 			kubeObj := test.LoadObject(dataDir+"serviceK8s.yaml", &v1.Service{})
-			test.CreateObject(testContext, kubeObj, true, 0)
+			test.CreateObject(testContext, kubeObj, false, 0)
 			Eventually(test.GetObject(testContext, kubeObj)).ShouldNot(BeNil())
 
 			By("deploy test Service")
 			tObj := test.LoadObject(dataDir+"serviceTest.yaml", &unstructured.Unstructured{})
-			test.CreateObject(testContext, tObj, true, 0)
+			test.CreateObject(testContext, tObj, false, 0)
 			Eventually(test.GetObject(testContext, tObj)).ShouldNot(BeNil())
 
 			By("deploy Composable object")
 			comp := test.LoadCompasable(dataDir + "compServices.yaml")
-			test.PostInNs(testContext, &comp, true, 0)
+			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 
 			By("get the output object and validate its fields")
@@ -341,7 +340,7 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 		It("should correctly create the Service instance", func() {
 
 			comp := test.LoadCompasable(dataDir + "comp.yaml")
-			test.PostInNs(testContext, &comp, true, 0)
+			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 
 			objNamespacedname := types.NamespacedName{Namespace: testContext.Namespace(), Name: "mymessagehub"}
@@ -379,8 +378,9 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 
 		BeforeEach(func() {
 			obj := test.LoadObject(dataDir+"mysecret.yaml", &v1.Secret{})
-			test.PostInNs(testContext, obj, true, 0)
+			test.PostInNs(testContext, obj, false, 0)
 			objNamespacedname = types.NamespacedName{Namespace: testContext.Namespace(), Name: "mymessagehub"}
+			Eventually(test.GetObject(testContext, obj)).ShouldNot(BeNil())
 		})
 
 		AfterEach(func() {
@@ -389,36 +389,58 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 		})
 
 		It("should correctly create the Service instance according to parameters from a Secret object", func() {
+			By("deploy Composable comp1.yaml")
 			comp := test.LoadCompasable(dataDir + "comp1.yaml")
 			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 
+			By("get underlying object - Service.ibmcloud.ibm.com/v1alpha1")
 			unstrObj := unstructured.Unstructured{}
 			unstrObj.SetGroupVersionKind(groupVersionKind)
 			klog.V(5).Infof("Get Object %s\n", objNamespacedname)
 			Eventually(test.GetUnstructuredObject(testContext, objNamespacedname, &unstrObj)).Should(Succeed())
+
+			By("validate service plan")
 			Ω(getPlan(unstrObj.Object)).Should(Equal("standard"))
+
+			By("Reload the Composable object")
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
+
+			By("validate that Composable object status is Online")
 			Eventually(test.GetState(testContext, &comp)).Should(Equal(OnlineStatus))
+
+			By("delete the composable object")
 			test.DeleteInNs(testContext, &comp, false)
 			Eventually(test.GetObject(testContext, &comp)).Should(BeNil())
 		})
 
 		It("should correctly create the Service instance according to parameters from a ConfigMap", func() {
+			By("Deploy the myconfigmap  ConfigMap")
 			obj := test.LoadObject(dataDir+"myconfigmap.yaml", &v1.ConfigMap{})
-			test.PostInNs(testContext, obj, true, 0)
+			test.PostInNs(testContext, obj, false, 0)
+			Eventually(test.GetObject(testContext, obj)).ShouldNot(BeNil())
 
+			By("deploy Composable comp2.yaml ")
 			comp := test.LoadCompasable(dataDir + "comp2.yaml")
 			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 
+			By("get underlying object - Service.ibmcloud.ibm.com/v1alpha1")
 			unstrObj := unstructured.Unstructured{}
 			unstrObj.SetGroupVersionKind(groupVersionKind)
 			klog.V(5).Infof("Get Object %s\n", objNamespacedname)
 			Eventually(test.GetUnstructuredObject(testContext, objNamespacedname, &unstrObj)).Should(Succeed())
+
+			By("validate service plan")
 			Ω(getPlan(unstrObj.Object)).Should(Equal("standard"))
+
+			By("Reload the Composable object")
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
+
+			By("validate that Composable object status is Online")
 			Eventually(test.GetState(testContext, &comp)).Should(Equal(OnlineStatus))
+
+			By("delete the composable object")
 			test.DeleteInNs(testContext, &comp, false)
 			Eventually(test.GetObject(testContext, &comp)).Should(BeNil())
 		})

@@ -1,6 +1,6 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG ?= cloudoperators/composable-controller
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true"
 
@@ -10,6 +10,7 @@ GOBIN=$(shell go env GOPATH)/bin
 else
 GOBIN=$(shell go env GOBIN)
 endif
+
 
 all: manager
 
@@ -87,6 +88,10 @@ endif
 lintall: fmt lint vet
 
 lint:
+# Get golint if it is not installed
+ifeq (, $(shell which golint))
+	go get golang.org/x/lint/golint
+endif
 	golint -set_exit_status=true api/ controllers/
 
 check-tag:
