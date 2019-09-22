@@ -49,13 +49,13 @@ func TestAPIs(t *testing.T) {
 	RunSpecsWithDefaultAndCustomReporters(t,
 		"Controller Suite",
 		[]Reporter{envtest.NewlineReporter{}})
-	SetDefaultEventuallyPollingInterval(1 * time.Second)
-	SetDefaultEventuallyTimeout(60 * time.Second)
 }
 
 var _ = BeforeSuite(func(done Done) {
 
 	logf.SetLogger(zap.LoggerTo(GinkgoWriter, true))
+	// SetDefaultEventuallyPollingInterval(1 * time.Second) // by default poll every 10 milliseconds
+	SetDefaultEventuallyTimeout(10 * time.Second) // by default the polling is up to 1 second
 
 	By("bootstrapping test environment")
 	t := true
@@ -96,17 +96,6 @@ var _ = BeforeSuite(func(done Done) {
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	//go func() {
-	//	err = k8sManager.Start(ctrl.SetupSignalHandler())
-	//	Expect(err).ToNot(HaveOccurred())
-	//
-	//	client := k8sManager.GetClient()
-	//	Expect(k8sClient).ToNot(BeNil())
-	//
-	//	testNs := test.SetupKubeOrDie(cfg, "test-ns-")
-	//	testContext = test.NewTestContext(client, testNs)
-	//}()
-
 	client := k8sManager.GetClient()
 
 	stop = test.StartTestManager(k8sManager)
@@ -119,6 +108,7 @@ var _ = BeforeSuite(func(done Done) {
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
 	close(stop)
+	time.Sleep(1 * time.Second)
 	err := testEnv.Stop()
 	Expect(err).ToNot(HaveOccurred())
 })
