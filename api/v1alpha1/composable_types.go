@@ -25,22 +25,32 @@ import (
 
 // ComposableSpec defines the desired state of Composable
 type ComposableSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+
+	// Template defines the underlying object
 	Template *runtime.RawExtension `json:"template"`
 }
 
 // ComposableStatus defines the observed state of Composable
 type ComposableStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-	State   string `json:"state,omitempty"`
+	// State shows the composable object state
+	// +optional
+	// +kubebuilder:validation:Enum=Failed;Pending;Online
+	State string `json:"state,omitempty"`
+
+	// Message - provides human readable explanation of the Composable status
+	// +optional
 	Message string `json:"message,omitempty"`
 }
 
+// Composable is the Schema for the Composables API
 // +kubebuilder:object:root=true
+// +kubebuilder:resource:path=composables,scope=Namespaced,shortName=comp
+// +kubebuilder:printcolumn:name="State",type=string,JSONPath=".status.state"
+// +kubebuilder:printcolumn:name="Resource Name",type=string,JSONPath=".spec.template.metadata.name"
+// +kubebuilder:printcolumn:name="Resource Kind",type=string,JSONPath=".spec.template.kind"
+// +kubebuilder:printcolumn:name="Resource apiVersion",type=string,JSONPath=".spec.template.apiVersion"
+// +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
 
-// Composable is the Schema for the composables API
 type Composable struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`

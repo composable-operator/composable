@@ -100,7 +100,7 @@ shutil.copyfile(os.path.join(config,"templates",ns),os.path.join(releases,new_na
 ix += 1
 
 # copy crds
-crds = os.path.join(config,"crds")
+crds = os.path.join(config,"crd", "bases")
 for filename in os.listdir(crds):
     new_name = "%03d_%s" % (ix,filename)
     shutil.copyfile(os.path.join(crds,filename),os.path.join(releases,new_name))
@@ -208,7 +208,7 @@ with open(os.path.join(config,"templates","template.clusterserviceversion.yaml")
     crdmap = {}
     for filename in os.listdir(releases):
         # we want only crds
-        if (filename.find("v1alpha1")<0):
+        if (filename.find("composables")<0):
             continue
         # load yaml
         with open(os.path.join(releases,filename), 'r') as crdstream:

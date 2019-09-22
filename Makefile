@@ -58,19 +58,19 @@ generate: controller-gen
 #docker-build: test
 #	docker build . -t ${IMG}
 
-docker-build: check-tag
+docker-build: check-tag test
 	docker build --no-cache . -t ${IMG}:${TAG}
 	@echo "updating kustomize image patch file for manager resource"
 	# sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
 
 
 # Push the docker image
-docker-push:
+docker-push: docker-build
 	docker login -u "${DOCKER_USERNAME}" -p ""${DOCKER_PASSWORD}""
 	docker push ${IMG}:${TAG}
 
 # make a release for olm and releases
-release: check-tag
+release: check-tag test
 	python hack/package.py v${TAG}
 
 # find or download controller-gen
