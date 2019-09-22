@@ -18,7 +18,7 @@
 <!-- END ` generated TOC please keep comment here to allow auto update -->
 
 *Note:* The project uses Golang modules, in order to  activate module support, please set the the `GO111MODULE` 
-environment variable to `on`. [How to Install and Activate Module Support] (https://github.com/golang/go/wiki/Modules#how-to-install-and-activate-module-support)
+environment variable to `on`. [How to Install and Activate Module Support](https://github.com/golang/go/wiki/Modules#how-to-install-and-activate-module-support)
  
 # Composable Operator
 
