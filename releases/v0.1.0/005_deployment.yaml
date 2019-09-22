@@ -23,10 +23,7 @@ spec:
         app: composable-operator
     spec:
       containers:
-      - args:
-        - -logtostderr=true
-        - -v=5
-        command:
+      - command:
         - ./manager
         image: cloudoperators/composable-controller:0.1.0
         imagePullPolicy: Always

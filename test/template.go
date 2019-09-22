@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog"
 
-	"github.com/ibm/composable/pkg/apis/ibmcloud/v1alpha1"
+	"github.com/ibm/composable/api/v1alpha1"
 )
 
 // PostInNs the object

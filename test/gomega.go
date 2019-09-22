@@ -19,7 +19,7 @@ package test
 import (
 	"context"
 
-	"github.com/ibm/composable/pkg/apis/ibmcloud/v1alpha1"
+	"github.com/ibm/composable/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
