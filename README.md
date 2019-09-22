@@ -106,8 +106,8 @@ A Composable  and a created object (`myconfigmap`) will be in teh same namespace
 
 ### An example of Service.ibmcloud.ibm.com
 
-Composable-operator project works tightly with 2 other related projects: (SolSA - Solution Service Architecture)[https://github.com/IBM/solsa]
-and (cloud-operators)[https://github.com/IBM/cloud-operators]. The [samples](./config/samples) directory has 3 different 
+Composable-operator project works tightly with 2 other related projects: [SolSA - Solution Service Architecture](https://github.com/IBM/solsa)
+and [cloud-operators](https://github.com/IBM/cloud-operators). The [samples](./config/samples) directory has 3 different 
 examples of creation/configuration of `Service.ibmcloud.ibm.com` from the `cloud-opertors` project.
 
 Here is one  of them 
@@ -186,7 +186,7 @@ The `getValueFrom` element should be a single child of the parent element and ca
 Filed | Is required | Format/Type | Comments
 ----- | ------------|-------------|-----------------
  kind | Yes | String | Kind of the input object
- group | No | String | Defines a K8s Api group of teh checking object. Helps to resolve conflicts, when the same `Kind` defined in several groups
+ group | No | String | Defines a K8s Api group of the checking object. Helps to resolve conflicts, when the same `Kind` defined in several groups
  name | Yes | String | Name of the input object
  namespace | No | String | Namespace of the input object, if isn't defined, the ns of the `Composable` operator will be checked
  path | Yes | String | The `jsonpath` formatted path to the checked filed
@@ -195,7 +195,7 @@ Filed | Is required | Format/Type | Comments
 ## Format transformers
 
 Sometimes, types of an input value and expected output value are not compatable, in order to resolve this issue, 
-`Composable` supports several predefined transformers. They can be defined as a string array, so output of the a previous 
+`Composable` supports several predefined transformers. They can be defined as a string array, so output of the previous 
 transformer's will be input to next one.
 When you define a `Composable` object, it is your responsibility to put in a correct order the transformers.
 
@@ -214,7 +214,7 @@ Transformer | Transformation
 `ObjectToJson` | transforms an object to a JSON string
 
 The data transformation roles are:
-* If there is no data transformers  -  original data format will be used, include complex structures such as maps or arrays.
+* If there is no data transformers - original data format will be used, include complex structures such as maps or arrays.
 * Transformers from the format-transformers array executed one after another according to their order. Which allows 
 creation of data transformation pipelines. For example, the following snippet defines transformation from a base64 
 encoded string to a plain string and after that to integer. This transformation can be useful to retrieve data from Secrets.
@@ -237,7 +237,7 @@ object namespace, no objects will be created, and `Composable` object status wil
 ## Deletion
 
 When the Composable object is deleted, the underlying object is deleted as well.
-If the user deletes the underlying object manually, it is automatically recreated`.
+If the user deletes the underlying object manually, it is automatically recreated.
 
 
 ## Field path discovery
