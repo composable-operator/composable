@@ -11,6 +11,7 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+
 all: manager
 
 # Run tests
@@ -87,6 +88,10 @@ endif
 lintall: fmt lint vet
 
 lint:
+# Get golint if it is not installed
+ifeq (, $(shell which golint))
+	go get golang.org/x/lint/golint
+endif
 	golint -set_exit_status=true api/ controllers/
 
 check-tag:
