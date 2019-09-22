@@ -301,9 +301,9 @@ var _ = Describe("Validate group separation", func() {
 			dataDir := "testdata/"
 
 			By("deploy K8s Service")
-			kObj := test.LoadObject(dataDir+"serviceK8s.yaml", &v1.Service{})
-			test.CreateObject(testContext, kObj, true, 0)
-			Eventually(test.GetObject(testContext, kObj)).ShouldNot(BeNil())
+			kubeObj := test.LoadObject(dataDir+"serviceK8s.yaml", &v1.Service{})
+			test.CreateObject(testContext, kubeObj, true, 0)
+			Eventually(test.GetObject(testContext, kubeObj)).ShouldNot(BeNil())
 
 			By("deploy test Service")
 			tObj := test.LoadObject(dataDir+"serviceTest.yaml", &unstructured.Unstructured{})
@@ -361,68 +361,68 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 
 			// TODO update for external test only
 			/*
-			By("Validate that the underlying object is deleted too")
-			objNamespacedname := types.NamespacedName{Namespace: testContext.Namespace(), Name: "mymessagehub"}
-			unstrObj := unstructured.Unstructured{}
-			unstrObj.SetGroupVersionKind(groupVersionKind)
-			Eventually(func() bool {
-				err := test.GetUnstructuredObject(testContext, objNamespacedname, &unstrObj)()
-				return errors.IsNotFound(err)
-			}).Should(BeTrue())
+				By("Validate that the underlying object is deleted too")
+				objNamespacedname := types.NamespacedName{Namespace: testContext.Namespace(), Name: "mymessagehub"}
+				unstrObj := unstructured.Unstructured{}
+				unstrObj.SetGroupVersionKind(groupVersionKind)
+				Eventually(func() bool {
+					err := test.GetUnstructuredObject(testContext, objNamespacedname, &unstrObj)()
+					return errors.IsNotFound(err)
+				}).Should(BeTrue())
 			*/
 		})
 
 	})
 
-		Context("create Service instance from ibmcloud.ibm.com WITH external dependencies", func() {
-			var objNamespacedname types.NamespacedName
+	Context("create Service instance from ibmcloud.ibm.com WITH external dependencies", func() {
+		var objNamespacedname types.NamespacedName
 
-			BeforeEach(func() {
-				obj := test.LoadObject(dataDir+"mysecret.yaml", &v1.Secret{})
-				test.PostInNs(testContext, obj, true, 0)
-				objNamespacedname = types.NamespacedName{Namespace: testContext.Namespace(), Name: "mymessagehub"}
-			})
-
-			AfterEach(func() {
-				obj := test.LoadObject(dataDir+"mysecret.yaml", &v1.Secret{})
-				test.DeleteInNs(testContext, obj, false)
-			})
-
-			It("should correctly create the Service instance according to parameters from a Secret object", func() {
-				comp := test.LoadCompasable(dataDir + "comp1.yaml")
-				test.PostInNs(testContext, &comp, false, 0)
-				Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
-
-				unstrObj := unstructured.Unstructured{}
-				unstrObj.SetGroupVersionKind(groupVersionKind)
-				klog.V(5).Infof("Get Object %s\n", objNamespacedname)
-				Eventually(test.GetUnstructuredObject(testContext, objNamespacedname, &unstrObj)).Should(Succeed())
-				Ω(getPlan(unstrObj.Object)).Should(Equal("standard"))
-				Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
-				Eventually(test.GetState(testContext, &comp)).Should(Equal(OnlineStatus))
-				test.DeleteInNs(testContext, &comp, false)
-				Eventually(test.GetObject(testContext, &comp)).Should(BeNil())
-			})
-
-			It("should correctly create the Service instance according to parameters from a ConfigMap", func() {
-				obj := test.LoadObject(dataDir+"myconfigmap.yaml", &v1.ConfigMap{})
-				test.PostInNs(testContext, obj, true, 0)
-
-				comp := test.LoadCompasable(dataDir + "comp2.yaml")
-				test.PostInNs(testContext, &comp, false, 0)
-				Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
-
-				unstrObj := unstructured.Unstructured{}
-				unstrObj.SetGroupVersionKind(groupVersionKind)
-				klog.V(5).Infof("Get Object %s\n", objNamespacedname)
-				Eventually(test.GetUnstructuredObject(testContext, objNamespacedname, &unstrObj)).Should(Succeed())
-				Ω(getPlan(unstrObj.Object)).Should(Equal("standard"))
-				Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
-				Eventually(test.GetState(testContext, &comp)).Should(Equal(OnlineStatus))
-				test.DeleteInNs(testContext, &comp, false)
-				Eventually(test.GetObject(testContext, &comp)).Should(BeNil())
-			})
+		BeforeEach(func() {
+			obj := test.LoadObject(dataDir+"mysecret.yaml", &v1.Secret{})
+			test.PostInNs(testContext, obj, true, 0)
+			objNamespacedname = types.NamespacedName{Namespace: testContext.Namespace(), Name: "mymessagehub"}
 		})
+
+		AfterEach(func() {
+			obj := test.LoadObject(dataDir+"mysecret.yaml", &v1.Secret{})
+			test.DeleteInNs(testContext, obj, false)
+		})
+
+		It("should correctly create the Service instance according to parameters from a Secret object", func() {
+			comp := test.LoadCompasable(dataDir + "comp1.yaml")
+			test.PostInNs(testContext, &comp, false, 0)
+			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
+
+			unstrObj := unstructured.Unstructured{}
+			unstrObj.SetGroupVersionKind(groupVersionKind)
+			klog.V(5).Infof("Get Object %s\n", objNamespacedname)
+			Eventually(test.GetUnstructuredObject(testContext, objNamespacedname, &unstrObj)).Should(Succeed())
+			Ω(getPlan(unstrObj.Object)).Should(Equal("standard"))
+			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
+			Eventually(test.GetState(testContext, &comp)).Should(Equal(OnlineStatus))
+			test.DeleteInNs(testContext, &comp, false)
+			Eventually(test.GetObject(testContext, &comp)).Should(BeNil())
+		})
+
+		It("should correctly create the Service instance according to parameters from a ConfigMap", func() {
+			obj := test.LoadObject(dataDir+"myconfigmap.yaml", &v1.ConfigMap{})
+			test.PostInNs(testContext, obj, true, 0)
+
+			comp := test.LoadCompasable(dataDir + "comp2.yaml")
+			test.PostInNs(testContext, &comp, false, 0)
+			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
+
+			unstrObj := unstructured.Unstructured{}
+			unstrObj.SetGroupVersionKind(groupVersionKind)
+			klog.V(5).Infof("Get Object %s\n", objNamespacedname)
+			Eventually(test.GetUnstructuredObject(testContext, objNamespacedname, &unstrObj)).Should(Succeed())
+			Ω(getPlan(unstrObj.Object)).Should(Equal("standard"))
+			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
+			Eventually(test.GetState(testContext, &comp)).Should(Equal(OnlineStatus))
+			test.DeleteInNs(testContext, &comp, false)
+			Eventually(test.GetObject(testContext, &comp)).Should(BeNil())
+		})
+	})
 
 })
 

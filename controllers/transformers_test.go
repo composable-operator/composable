@@ -39,13 +39,13 @@ var _ = Describe("./pkg/controller/composable/trnsformers", func() {
 		Entry("ToString, StringToBase64, Base64ToString, StringToInt", 13, []string{ToString, StringToBase64, Base64ToString, StringToInt}, 13),
 		Entry("ToString, StringToBase64, Base64ToString, StringToBool", true, []string{ToString, StringToBase64, Base64ToString, StringToBool}, true),
 		Entry("JsonToObject, ArrayToCSString", "[\"kafka04-prod02.messagehub.services.us-south.bluemix.net:9093\",\"kafka03-prod02.messagehub.services.us-south.bluemix.net:9093\",\"kafka05-prod02.messagehub.services.us-south.bluemix.net:9093\",\"kafka02-prod02.messagehub.services.us-south.bluemix.net:9093\",\"kafka01-prod02.messagehub.services.us-south.bluemix.net:9093\"]",
-			[]string{JsonToObject, ArrayToCSString},
+			[]string{JSONToObject, ArrayToCSString},
 			"kafka04-prod02.messagehub.services.us-south.bluemix.net:9093,kafka03-prod02.messagehub.services.us-south.bluemix.net:9093,kafka05-prod02.messagehub.services.us-south.bluemix.net:9093,kafka02-prod02.messagehub.services.us-south.bluemix.net:9093,kafka01-prod02.messagehub.services.us-south.bluemix.net:9093"),
 		Entry("Base64ToString, JsonToObject, ArrayToCSString", "WyJrYWZrYTA0LXByb2QwMi5tZXNzYWdlaHViLnNlcnZpY2VzLnVzLXNvdXRoLmJsdWVtaXgubmV0OjkwOTMiLCJrYWZrYTAzLXByb2QwMi5tZXNzYWdlaHViLnNlcnZpY2VzLnVzLXNvdXRoLmJsdWVtaXgubmV0OjkwOTMiLCJrYWZrYTA1LXByb2QwMi5tZXNzYWdlaHViLnNlcnZpY2VzLnVzLXNvdXRoLmJsdWVtaXgubmV0OjkwOTMiLCJrYWZrYTAyLXByb2QwMi5tZXNzYWdlaHViLnNlcnZpY2VzLnVzLXNvdXRoLmJsdWVtaXgubmV0OjkwOTMiLCJrYWZrYTAxLXByb2QwMi5tZXNzYWdlaHViLnNlcnZpY2VzLnVzLXNvdXRoLmJsdWVtaXgubmV0OjkwOTMiXQo=",
-			[]string{Base64ToString, JsonToObject, ArrayToCSString},
+			[]string{Base64ToString, JSONToObject, ArrayToCSString},
 			"kafka04-prod02.messagehub.services.us-south.bluemix.net:9093,kafka03-prod02.messagehub.services.us-south.bluemix.net:9093,kafka05-prod02.messagehub.services.us-south.bluemix.net:9093,kafka02-prod02.messagehub.services.us-south.bluemix.net:9093,kafka01-prod02.messagehub.services.us-south.bluemix.net:9093"),
 		Entry("ObjectToJson", []Planet{{Name: "Mercury", YearSpan: 88}, {Name: "Venus", YearSpan: 243}, {Name: "Earth", YearSpan: 365}},
-			[]string{ObjectToJson},
+			[]string{ObjectToJSON},
 			"[{\"Name\":\"Mercury\",\"YearSpan\":88},{\"Name\":\"Venus\",\"YearSpan\":243},{\"Name\":\"Earth\",\"YearSpan\":365}]"))
 
 	DescribeTable("Test Array2CSStringTransformer",

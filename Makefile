@@ -87,7 +87,7 @@ endif
 lintall: fmt lint vet
 
 lint:
-	golint -set_exit_status=false api/ controllers/
+	golint -set_exit_status=true api/ controllers/
 
 check-tag:
 ifndef TAG

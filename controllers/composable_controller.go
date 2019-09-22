@@ -63,9 +63,14 @@ const (
 	transformers   = "format-transformers"
 	controllerName = "Compasable-controller"
 
-	FailedStatus  = "Failed"
+	// FailedStatus composable status
+	FailedStatus = "Failed"
+
+	// PendingStatus - indicates that the Composable object is pending for something
 	PendingStatus = "Pending"
-	OnlineStatus  = "Online"
+
+	// OnlineStatus - indicates that Composable successfully created underlying objects
+	OnlineStatus = "Online"
 )
 
 // ComposableReconciler reconciles a Composable object
@@ -104,8 +109,8 @@ func (r *ComposableReconciler) setController(controller controller.Controller) {
 	r.controller = controller
 }
 
+// Reconcile loop method
 // +kubebuilder:rbac:groups=*,resources=*,verbs=*
-
 func (r *ComposableReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
 	_ = r.Log.WithValues("composable", req.NamespacedName)
@@ -263,6 +268,7 @@ func (r *ComposableReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 	//return ctrl.Result{}, nil
 }
 
+// SetupWithManager adds this controller to the manager
 func (r *ComposableReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	//return ctrl.NewControllerManagedBy(mgr).
 	//	For(&ibmcloudv1alpha1.Composable{}).
@@ -335,7 +341,7 @@ func (r *ComposableReconciler) resolveFields(fields interface{}, composableNames
 				} else if values, ok := v.(map[string]interface{}); ok {
 					if value, ok := values[getValueFrom]; ok {
 						if len(values) > 1 {
-							return nil, fmt.Errorf("Failed: Template is ill-formed. GetValueFrom must be the only field in a value.")
+							return nil, fmt.Errorf("Failed: Template is ill-formed. GetValueFrom must be the only field in a value")
 						}
 						newFields, err = r.resolveValue(value, composableNamespace, cache)
 					} else {
@@ -373,11 +379,8 @@ func (r *ComposableReconciler) resolveFields(fields interface{}, composableNames
 	return fields, nil
 }
 
+// GetServerPreferredResources returns preferred API resources
 func (r *ComposableReconciler) GetServerPreferredResources() ([]*metav1.APIResourceList, error) {
-	//client, err := discovery.NewDiscoveryClientForConfig(config)
-	//if err != nil {
-	//	return nil, fmt.Errorf("Error creating discovery client %v", err)
-	//}
 	resourceLists, err := r.DiscoveryClient.ServerPreferredResources()
 	//resourceLists, err := client.ServerPreferredResources()
 	if err != nil {
@@ -386,6 +389,7 @@ func (r *ComposableReconciler) GetServerPreferredResources() ([]*metav1.APIResou
 	return resourceLists, nil
 }
 
+// NameMatchesResource checks if the given resource name/kind and group matches with API resource and its group
 func NameMatchesResource(name string, objGroup string, resource metav1.APIResource, resGroup string) bool {
 	lowerCaseName := strings.ToLower(name)
 	if len(objGroup) > 0 {
@@ -394,9 +398,8 @@ func NameMatchesResource(name string, objGroup string, resource metav1.APIResour
 				lowerCaseName == resource.SingularName ||
 				lowerCaseName == strings.ToLower(resource.Kind)) {
 			return true
-		} else {
-			return false
 		}
+		return false
 	}
 	if lowerCaseName == resource.Name ||
 		lowerCaseName == resource.SingularName ||
@@ -414,21 +417,13 @@ func NameMatchesResource(name string, objGroup string, resource metav1.APIResour
 }
 
 func groupQualifiedName(name, group string) string {
-	apiResource := metav1.APIResource{
-		Name:  name,
-		Group: group,
+	if len(group) == 0 {
+		return name
 	}
-	return GroupQualifiedName(apiResource)
+	return fmt.Sprintf("%s.%s", name, group)
 }
 
-func GroupQualifiedName(apiResource metav1.APIResource) string {
-	if len(apiResource.Group) == 0 {
-		return apiResource.Name
-	}
-	return fmt.Sprintf("%s.%s", apiResource.Name, apiResource.Group)
-}
-
-func (r *ComposableReconciler) LookupAPIResource(objKind, objGroup string, cache *composableCache) (*metav1.APIResource, error) {
+func (r *ComposableReconciler) lookupAPIResource(objKind, objGroup string, cache *composableCache) (*metav1.APIResource, error) {
 	var resources []*metav1.APIResourceList
 	//if len(apiVersion) > 0  {
 	//if cache.resourceMap == nil {
@@ -487,14 +482,14 @@ Loop:
 		}
 	}
 	if !coreGroupObject && len(matchedResources) > 1 {
-		return nil, fmt.Errorf("Multiple resources are matched by %q: %s. A group-qualified plural name must be provided.", kind, strings.Join(matchedResources, ", "))
+		return nil, fmt.Errorf("Multiple resources are matched by %q: %s. A group-qualified plural name must be provided", kind, strings.Join(matchedResources, ", "))
 	}
 
 	if targetResource != nil {
 		return targetResource, nil
 	}
 
-	return nil, fmt.Errorf("Unable to find api resource named %q.", kind)
+	return nil, fmt.Errorf("Unable to find api resource named %q", kind)
 }
 
 func (r *ComposableReconciler) resolveValue(value interface{}, composableNamespace string, cache *composableCache) (interface{}, error) {
@@ -504,7 +499,7 @@ func (r *ComposableReconciler) resolveValue(value interface{}, composableNamespa
 			if objGroup, ok = val[group].(string); !ok {
 				objGroup = ""
 			}
-			res, err := r.LookupAPIResource(objKind, objGroup, cache)
+			res, err := r.lookupAPIResource(objKind, objGroup, cache)
 			if err != nil {
 				// If an input object API resource is not installed, we return error even if a default value is set.
 				return nil, err
@@ -533,7 +528,7 @@ func (r *ComposableReconciler) resolveValue(value interface{}, composableNamespa
 								// we have checked the object and did not fined it
 								return errorToDefaultValue(val, obj.(toumbstone).err)
 							default:
-								err := fmt.Errorf("wrong type of cached object %T!", obj)
+								err := fmt.Errorf("wrong type of cached object %T", obj)
 								klog.Errorf("%s", err.Error())
 								return nil, err
 							}

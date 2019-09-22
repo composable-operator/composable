@@ -24,21 +24,38 @@ import (
 )
 
 const (
-	Base64ToString  = "Base64ToString"
-	StringToBase64  = "StringToBase64"
-	StringToInt     = "StringToInt"
-	StringToFloat   = "StringToFloat"
-	StringToBool    = "StringToBool"
+	// Base64ToString - name of the base64 to string transformer
+	Base64ToString = "Base64ToString"
+
+	// StringToBase64 - name of the string to base64 transformer
+	StringToBase64 = "StringToBase64"
+
+	// StringToInt - name of the string to integer transformer
+	StringToInt = "StringToInt"
+
+	// StringToFloat - name of the string to float transformer
+	StringToFloat = "StringToFloat"
+
+	// StringToBool - name of the string to boolean transformer
+	StringToBool = "StringToBool"
+
+	// ArrayToCSString - name of the array to Comma Separated String (CSS) transformer
 	ArrayToCSString = "ArrayToCSString"
-	JsonToObject    = "JsonToObject"
-	ObjectToJson    = "ObjectToJson"
-	ToString        = "ToString"
+
+	// JSONToObject - name of the JSON to object transformer
+	JSONToObject = "JsonToObject"
+
+	// ObjectToJSON - name of the object to JSON transformer
+	ObjectToJSON = "ObjectToJson"
+
+	// ToString - name of the transformer, that transforms any object to its native string representation
+	ToString = "ToString"
 )
 
-// Base Transformer function
+// Transformer - the base transformer function
 type Transformer func(interface{}) (interface{}, error)
 
-// Compound Transformer function
+// CompoundTransformer - the function that combines several transformers
 func CompoundTransformer(value interface{}, transformers ...Transformer) (interface{}, error) {
 	tempValue := value
 	var err error
@@ -51,7 +68,7 @@ func CompoundTransformer(value interface{}, transformers ...Transformer) (interf
 	return tempValue, nil
 }
 
-// Compound Transformer function
+// CompoundTransformerNames returns names of the given transformers
 func CompoundTransformerNames(value interface{}, transNames ...string) (interface{}, error) {
 	tempValue := value
 	for _, trName := range transNames {
@@ -83,16 +100,17 @@ func string2Transformer(transformerName string) (Transformer, error) {
 		return String2BoolTransformer, nil
 	case ArrayToCSString:
 		return Array2CSStringTransformer, nil
-	case JsonToObject:
-		return JsonToObjectTransformer, nil
-	case ObjectToJson:
-		return ObjectToJsonTransformer, nil
+	case JSONToObject:
+		return JSONToObjectTransformer, nil
+	case ObjectToJSON:
+		return ObjectToJSONTransformer, nil
 	default:
 		return nil, fmt.Errorf("Wrong transformer name %q", transformerName)
 	}
 
 }
 
+//Array2CSStringTransformer ...
 func Array2CSStringTransformer(intValue interface{}) (interface{}, error) {
 	var str strings.Builder
 	switch reflect.TypeOf(intValue).Kind() {
@@ -110,7 +128,8 @@ func Array2CSStringTransformer(intValue interface{}) (interface{}, error) {
 	}
 }
 
-func JsonToObjectTransformer(value interface{}) (interface{}, error) {
+// JSONToObjectTransformer ...
+func JSONToObjectTransformer(value interface{}) (interface{}, error) {
 	if strValue, ok := value.(string); ok {
 		var data interface{}
 		err := json.Unmarshal([]byte(strValue), &data)
@@ -122,7 +141,8 @@ func JsonToObjectTransformer(value interface{}) (interface{}, error) {
 	return nil, fmt.Errorf("The given %v has type %T, and it is not a JSON string", value, value)
 }
 
-func ObjectToJsonTransformer(value interface{}) (interface{}, error) {
+// ObjectToJSONTransformer ...
+func ObjectToJSONTransformer(value interface{}) (interface{}, error) {
 	retVal, err := json.Marshal(value)
 	if err != nil {
 		return nil, err
@@ -130,6 +150,7 @@ func ObjectToJsonTransformer(value interface{}) (interface{}, error) {
 	return string(retVal), err
 }
 
+// Base642StringTransformer ...
 func Base642StringTransformer(value interface{}) (interface{}, error) {
 	if strValue, ok := value.(string); ok {
 		decoded, err := base64.StdEncoding.DecodeString(strValue)
@@ -141,6 +162,7 @@ func Base642StringTransformer(value interface{}) (interface{}, error) {
 	return nil, fmt.Errorf("The given %v has type %T, and it is not a string", value, value)
 }
 
+// String2Base64Transformer ...
 func String2Base64Transformer(value interface{}) (interface{}, error) {
 	if strValue, ok := value.(string); ok {
 		return base64.StdEncoding.EncodeToString([]byte(strValue)), nil
@@ -148,39 +170,43 @@ func String2Base64Transformer(value interface{}) (interface{}, error) {
 	return nil, fmt.Errorf("The given %v has type %T, and it is not a string", value, value)
 }
 
+// ToStringTransformer ...
 func ToStringTransformer(value interface{}) (interface{}, error) {
 	return fmt.Sprintf("%v", value), nil
 }
 
+// String2IntTransformer ...
 func String2IntTransformer(value interface{}) (interface{}, error) {
 	if strValue, ok := value.(string); ok {
-		if n, err := strconv.Atoi(strValue); err == nil {
+		n, err := strconv.Atoi(strValue)
+		if err == nil {
 			return n, nil
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 	return nil, fmt.Errorf("The given %v has type %T, and it is not a string", value, value)
 }
 
+// String2FloatTransformer ...
 func String2FloatTransformer(value interface{}) (interface{}, error) {
 	if strValue, ok := value.(string); ok {
-		if f, err := strconv.ParseFloat(strValue, 64); err == nil {
+		f, err := strconv.ParseFloat(strValue, 64)
+		if err == nil {
 			return f, nil
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 	return nil, fmt.Errorf("The given %v has type %T, and it is not a string", value, value)
 }
 
+// String2BoolTransformer ...
 func String2BoolTransformer(value interface{}) (interface{}, error) {
 	if strValue, ok := value.(string); ok {
-		if f, err := strconv.ParseBool(strValue); err == nil {
+		f, err := strconv.ParseBool(strValue)
+		if err == nil {
 			return f, nil
-		} else {
-			return nil, err
 		}
+		return nil, err
 	}
 	return nil, fmt.Errorf("The given %v has type %T, and it is not a string", value, value)
 }
