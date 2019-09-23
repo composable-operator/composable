@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
+	memory "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/third_party/forked/golang/template"
 	"k8s.io/client-go/util/jsonpath"
@@ -74,46 +75,60 @@ const (
 )
 
 // ComposableReconciler reconciles a Composable object
-type ComposableReconciler struct {
+type composableReconciler struct {
 	client.Client
-	Log             logr.Logger
-	DiscoveryClient discovery.DiscoveryInterface
-	Config          *rest.Config
-	Scheme          *runtime.Scheme
+	log             logr.Logger
+	discoveryClient discovery.CachedDiscoveryInterface
+	config          *rest.Config
+	scheme          *runtime.Scheme
 	controller      controller.Controller
 }
 
-type reconcilerWithController interface {
+// ManagerSettableReconciler - a Reconciler that can be added to a Manager
+type ManagerSettableReconciler interface {
 	reconcile.Reconciler
-	getController() controller.Controller
-	setController(controller controller.Controller)
+	SetupWithManager(mgr ctrl.Manager) error
 }
 
-var _ reconcilerWithController = &ComposableReconciler{}
+var _ ManagerSettableReconciler = &composableReconciler{}
 
 type composableCache struct {
 	objects map[string]interface{}
-	// TODO replace by mem cache from K8s 1.14
-	resources []*metav1.APIResourceList
 }
 
 type toumbstone struct {
 	err error
 }
 
-func (r *ComposableReconciler) getController() controller.Controller {
+// NewReconciler ...
+func NewReconciler(mgr ctrl.Manager) ManagerSettableReconciler {
+	cfg := mgr.GetConfig()
+	discClient := discovery.NewDiscoveryClientForConfigOrDie(cfg)
+	return &composableReconciler{
+		Client:          mgr.GetClient(),
+		log:             ctrl.Log.WithName("controllers").WithName("Composable"),
+		discoveryClient: memory.NewMemCacheClient(discClient),
+		scheme:          mgr.GetScheme(),
+		config:          cfg,
+	}
+}
+
+func (r *composableReconciler) getController() controller.Controller {
 	return r.controller
 }
 
-func (r *ComposableReconciler) setController(controller controller.Controller) {
+func (r *composableReconciler) setController(controller controller.Controller) {
 	r.controller = controller
 }
 
 // Reconcile loop method
 // +kubebuilder:rbac:groups=*,resources=*,verbs=*
-func (r *ComposableReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *composableReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
-	_ = r.Log.WithValues("composable", req.NamespacedName)
+	_ = r.log.WithValues("composable", req.NamespacedName)
+
+	// TODO should we use a separate go routine to invalidate it ?
+	r.discoveryClient.Invalidate()
 
 	klog.V(5).Infoln("Start Reconcile loop")
 	// Fetch the Composable instance
@@ -190,7 +205,7 @@ func (r *ComposableReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 
 	klog.V(5).Info("Resource kind is: " + kind)
 
-	if err := controllerutil.SetControllerReference(instance, &resource, r.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(instance, &resource, r.scheme); err != nil {
 		r.errorHandler(instance, err, PendingStatus, "", "")
 		return ctrl.Result{}, err
 	}
@@ -269,10 +284,7 @@ func (r *ComposableReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 }
 
 // SetupWithManager adds this controller to the manager
-func (r *ComposableReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	//return ctrl.NewControllerManagedBy(mgr).
-	//	For(&ibmcloudv1alpha1.Composable{}).
-	//	Complete(r)
+func (r *composableReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
@@ -296,7 +308,7 @@ func toJSONFromRaw(content *runtime.RawExtension) (interface{}, error) {
 	return data, nil
 }
 
-func (r *ComposableReconciler) resolve(object interface{}, composableNamespace string) (unstructured.Unstructured, error) {
+func (r *composableReconciler) resolve(object interface{}, composableNamespace string) (unstructured.Unstructured, error) {
 	// Set namespace if undefined
 	objMap := object.(map[string]interface{})
 	if _, ok := objMap[metadata]; !ok {
@@ -325,7 +337,7 @@ func (r *ComposableReconciler) resolve(object interface{}, composableNamespace s
 	return ret, nil
 }
 
-func (r *ComposableReconciler) resolveFields(fields interface{}, composableNamespace string, cache *composableCache) (interface{}, error) {
+func (r *composableReconciler) resolveFields(fields interface{}, composableNamespace string, cache *composableCache) (interface{}, error) {
 	switch fields.(type) {
 	case map[string]interface{}:
 		if fieldsOut, ok := fields.(map[string]interface{}); ok {
@@ -380,9 +392,8 @@ func (r *ComposableReconciler) resolveFields(fields interface{}, composableNames
 }
 
 // GetServerPreferredResources returns preferred API resources
-func (r *ComposableReconciler) GetServerPreferredResources() ([]*metav1.APIResourceList, error) {
-	resourceLists, err := r.DiscoveryClient.ServerPreferredResources()
-	//resourceLists, err := client.ServerPreferredResources()
+func (r *composableReconciler) GetServerPreferredResources() ([]*metav1.APIResourceList, error) {
+	resourceLists, err := r.discoveryClient.ServerPreferredResources()
 	if err != nil {
 		return nil, fmt.Errorf("Error listing api resources, %v", err)
 	}
@@ -423,31 +434,13 @@ func groupQualifiedName(name, group string) string {
 	return fmt.Sprintf("%s.%s", name, group)
 }
 
-func (r *ComposableReconciler) lookupAPIResource(objKind, objGroup string, cache *composableCache) (*metav1.APIResource, error) {
+func (r *composableReconciler) lookupAPIResource(objKind, objGroup string) (*metav1.APIResource, error) {
 	var resources []*metav1.APIResourceList
-	//if len(apiVersion) > 0  {
-	//if cache.resourceMap == nil {
-	//	res, err := r.discoveryClient.ServerResourcesForGroupVersion(apiVersion)
-	//	if err != nil {
-	//		fmt.Printf(" apiVersion error %s\n", err)
-	//		return nil, err
-	//	}
-	//	cache.resourceMap = make(map[string]*metav1.APIResourceList)
-	//	cache.resourceMap[apiVersion] = res
-	//}
-	//resources = []*metav1.APIResourceList{cache.resourceMap[apiVersion]}
-	//fmt.Printf(" apiVersion2 %s %v \n", apiVersion, resources)
-	//} else {
-	if cache.resources == nil {
-		klog.V(6).Infoln("Resources is nil")
-		resourceList, err := r.GetServerPreferredResources()
-		if err != nil {
-			return nil, err
-		}
-		cache.resources = resourceList
+
+	resources, err := r.GetServerPreferredResources()
+	if err != nil {
+		return nil, err
 	}
-	resources = cache.resources
-	//	}
 
 	var targetResource *metav1.APIResource
 	var matchedResources []string
@@ -492,14 +485,14 @@ Loop:
 	return nil, fmt.Errorf("Unable to find api resource named %q", kind)
 }
 
-func (r *ComposableReconciler) resolveValue(value interface{}, composableNamespace string, cache *composableCache) (interface{}, error) {
+func (r *composableReconciler) resolveValue(value interface{}, composableNamespace string, cache *composableCache) (interface{}, error) {
 	if val, ok := value.(map[string]interface{}); ok {
 		if objKind, ok := val[kind].(string); ok {
 			objGroup := ""
 			if objGroup, ok = val[group].(string); !ok {
 				objGroup = ""
 			}
-			res, err := r.lookupAPIResource(objKind, objGroup, cache)
+			res, err := r.lookupAPIResource(objKind, objGroup)
 			if err != nil {
 				// If an input object API resource is not installed, we return error even if a default value is set.
 				return nil, err
@@ -634,15 +627,7 @@ func getState(obj map[string]interface{}) (string, error) {
 	return "", fmt.Errorf("Failed: Composable doesn't contain state")
 }
 
-//func (r *ComposableReconciler) getController() controller.Controller {
-//	return r.controller
-//}
-//
-//func (r *ComposableReconciler) setController(controller controller.Controller) {
-//	r.controller = controller
-//}
-
-func (r *ComposableReconciler) errorHandler(instance *ibmcloudv1alpha1.Composable, err error, status, statusMsg, errMsg string) {
+func (r *composableReconciler) errorHandler(instance *ibmcloudv1alpha1.Composable, err error, status, statusMsg, errMsg string) {
 	if err == nil {
 		return
 	}
