@@ -22,7 +22,6 @@ import (
 	ibmcloudv1alpha1 "github.com/ibm/composable/api/v1alpha1"
 	"github.com/ibm/composable/controllers"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/discovery"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -62,13 +61,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.ComposableReconciler{
-		Client:          mgr.GetClient(),
-		Log:             ctrl.Log.WithName("controllers").WithName("Composable"),
-		DiscoveryClient: discovery.NewDiscoveryClientForConfigOrDie(mgr.GetConfig()),
-		Scheme:          mgr.GetScheme(),
-		Config:          mgr.GetConfig(),
-	}).SetupWithManager(mgr); err != nil {
+	if err = controllers.NewReconciler(mgr).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Composable")
 		os.Exit(1)
 	}

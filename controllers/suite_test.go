@@ -25,7 +25,6 @@ import (
 	"github.com/ibm/composable/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -87,13 +86,7 @@ var _ = BeforeSuite(func(done Done) {
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{SyncPeriod: &syncPeriod, MetricsBindAddress: "0"})
 	Expect(err).NotTo(HaveOccurred())
 
-	err = (&ComposableReconciler{
-		Client:          k8sManager.GetClient(),
-		Log:             ctrl.Log.WithName("controllers").WithName("SecretScope"),
-		DiscoveryClient: discovery.NewDiscoveryClientForConfigOrDie(cfg),
-		Scheme:          k8sManager.GetScheme(),
-		Config:          k8sManager.GetConfig(),
-	}).SetupWithManager(k8sManager)
+	err = NewReconciler(k8sManager).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	client := k8sManager.GetClient()
