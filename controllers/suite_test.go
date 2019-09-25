@@ -21,6 +21,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
+
 	webappv1 "github.com/ibm/composable/api/v1alpha1"
 	"github.com/ibm/composable/test"
 	. "github.com/onsi/ginkgo"
@@ -31,7 +34,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	contrZap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -52,7 +55,8 @@ func TestAPIs(t *testing.T) {
 
 var _ = BeforeSuite(func(done Done) {
 
-	logf.SetLogger(zap.LoggerTo(GinkgoWriter, true))
+	logf.SetLogger(zapr.NewLogger(contrZap.RawLoggerTo(GinkgoWriter, true, zap.AddCaller())))
+
 	// SetDefaultEventuallyPollingInterval(1 * time.Second) // by default poll every 10 milliseconds
 	SetDefaultEventuallyTimeout(10 * time.Second) // by default the polling is up to 1 second
 
