@@ -16,11 +16,11 @@ all: manager
 
 # Run tests
 test: generate fmt vet manifests
-	TEST_USE_EXISTING_CLUSTER=false go test ./api/... ./controllers/... -coverprofile cover.out.tmp -test.v -ginkgo.slowSpecThreshold=7
+	TEST_USE_EXISTING_CLUSTER=false go test ./api/... ./controllers/... -coverprofile cover.out -test.v -ginkgo.slowSpecThreshold=7
 
 # Run tests with existing cluster
 test-existing: generate fmt vet manifests
-	TEST_USE_EXISTING_CLUSTER=true go test ./api/... ./controllers/... -coverprofile cover.out.tmp -test.v -ginkgo.slowSpecThreshold=7
+	TEST_USE_EXISTING_CLUSTER=true go test ./api/... ./controllers/... -coverprofile cover.out -test.v -ginkgo.slowSpecThreshold=7
 
 # Build manager binary
 manager: generate fmt vet

@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"runtime/debug"
 	"strings"
 	"time"
 
@@ -36,7 +35,6 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/third_party/forked/golang/template"
 	"k8s.io/client-go/util/jsonpath"
-	"k8s.io/klog"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -56,6 +54,7 @@ const (
 	namespace      = "namespace"
 	metadata       = "metadata"
 	kind           = "kind"
+	apiVersion     = "apiVersion"
 	group          = "group"
 	spec           = "spec"
 	status         = "status"
@@ -127,160 +126,179 @@ func (r *composableReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 	_ = context.Background()
 	_ = r.log.WithValues("composable", req.NamespacedName)
 
+	r.log.Info("Starting reconcile loop", "request", req)
+	defer r.log.Info("Finish reconcile loop", "request", req)
+
 	// TODO should we use a separate go routine to invalidate it ?
 	r.discoveryClient.Invalidate()
 
-	klog.V(5).Infoln("Start Reconcile loop")
 	// Fetch the Composable instance
-	instance := &ibmcloudv1alpha1.Composable{}
-	err := r.Get(context.TODO(), req.NamespacedName, instance)
+	compInstance := &ibmcloudv1alpha1.Composable{}
+	err := r.Get(context.TODO(), req.NamespacedName, compInstance)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// Object not found, return.  Created objects are automatically garbage collected.
+			// Object not found, return.
 			// For additional cleanup logic use finalizers.
+			r.log.Info("Reconciled object is not found, return", "request", req)
 			return ctrl.Result{}, nil
 		}
 		// Error reading the object - requeue the request.
+		r.log.Error(err, "Get reconciled object returned", "object", req)
 		return ctrl.Result{}, err
 	}
-	klog.V(5).Infof("Reconcile loop for %s/%s", instance.Namespace, instance.Name)
-	if reflect.DeepEqual(instance.Status, ibmcloudv1alpha1.ComposableStatus{}) {
-		instance.Status = ibmcloudv1alpha1.ComposableStatus{State: PendingStatus, Message: "Creating resource"}
-		if err := r.Update(context.Background(), instance); err != nil {
-			return ctrl.Result{}, nil
+
+	status := ibmcloudv1alpha1.ComposableStatus{}
+	defer func() {
+		if len(status.Message) == 0 {
+			status.Message = time.Now().Format(time.RFC850)
 		}
+		// Set Composable object Status
+		if len(status.State) > 0 &&
+			((status.State != OnlineStatus && reflect.DeepEqual(status, compInstance.Status)) ||
+				status.State == OnlineStatus && compInstance.Status.State != OnlineStatus) {
+			r.log.V(1).Info("Set status", "desired status", status, "object", req)
+			compInstance.Status.State = status.State
+			compInstance.Status.Message = status.Message
+			if err := r.Update(context.Background(), compInstance); err != nil {
+				r.log.Error(err, "Update status", "desired status", status, "object", req, "compInstance", compInstance)
+			}
+		}
+	}()
+	// If Status is not set, set it to Pending
+	if reflect.DeepEqual(compInstance.Status, ibmcloudv1alpha1.ComposableStatus{}) {
+		status.State = PendingStatus
+		status.Message = "Creating resource"
 	}
-	if instance.Spec.Template == nil {
-		klog.V(5).Infof("The object's %s/%s spec doesn't contain `Template`", instance.Namespace, instance.Name)
-		// The object's spec doesn't contain `Template`
+	if compInstance.Spec.Template == nil {
+		err := fmt.Errorf("The object's spec doesn't contain `Template`")
+		r.log.Error(err, "object", req)
+		status.State = FailedStatus
+		status.Message = err.Error()
 		return ctrl.Result{}, nil
 	}
-	object, err := toJSONFromRaw(instance.Spec.Template)
+	object, err := r.toJSONFromRaw(compInstance.Spec.Template)
 	if err != nil {
-		r.errorHandler(instance, err, PendingStatus, "", "Failed to read template data:")
-		return ctrl.Result{}, err
+		// we don't print the error, it was done in toJSONFromRaw
+		status.State = FailedStatus
+		status.Message = err.Error()
+		// we cannot return the error, because retries do not help
+		return ctrl.Result{}, nil
 	}
-	resource, err := r.resolve(object, instance.Namespace)
+
+	resource, err := r.resolve(object, compInstance.Namespace)
 
 	if err != nil {
+		// TODO check error and return error value
 		if strings.Contains(err.Error(), FailedStatus) {
-			r.errorHandler(instance, err, FailedStatus, "", "")
+			status.State = FailedStatus
+			status.Message = err.Error()
 			return ctrl.Result{}, nil
 		}
-		klog.Errorf("Error !!! %v\n", err)
-		r.errorHandler(instance, err, PendingStatus, "", "Problem resolving template:")
+		status.State = PendingStatus
+		status.Message = err.Error()
 		return ctrl.Result{}, err
 	}
+	// if createUnderlyingObject faces with errors, it will update the state
+	status.State = OnlineStatus
+	return ctrl.Result{}, r.createUnderlyingObject(resource, compInstance, &status)
+}
+
+func (r *composableReconciler) createUnderlyingObject(resource unstructured.Unstructured,
+	compInstance *ibmcloudv1alpha1.Composable,
+	status *ibmcloudv1alpha1.ComposableStatus) error {
 
 	name, err := getName(resource.Object)
 	if err != nil {
-		r.errorHandler(instance, err, FailedStatus, "", "")
-		return ctrl.Result{}, nil
-
+		status.State = FailedStatus
+		status.Message = err.Error()
+		return nil
 	}
-
-	klog.V(5).Info("Resource name is: " + name)
+	r.log.V(1).Info("Resource name is: "+name, "comName", compInstance.Name)
 
 	namespace, err := getNamespace(resource.Object)
 	if err != nil {
-		r.errorHandler(instance, err, FailedStatus, "", "")
-		return ctrl.Result{}, nil
+		status.State = FailedStatus
+		status.Message = err.Error()
+		return nil
 	}
+	r.log.V(1).Info("Resource namespace is: "+namespace, "comName", compInstance.Name)
 
-	klog.V(5).Info("Resource namespace is: " + namespace)
-
-	apiversion, ok := resource.Object["apiVersion"].(string)
+	apiversion, ok := resource.Object[apiVersion].(string)
 	if !ok {
-		r.errorHandler(instance, err, FailedStatus, "The template has no apiVersion", "")
-		return ctrl.Result{}, nil
+		err := fmt.Errorf("The template has no apiVersion")
+		r.log.Error(err, "", "template", resource.Object, "comName", compInstance.Name)
+		status.State = FailedStatus
+		status.Message = err.Error()
+		return nil
 	}
+	r.log.V(1).Info("Resource apiversion is: "+apiversion, "comName", compInstance.Name)
 
-	klog.V(5).Info("Resource apiversion is: " + apiversion)
-
-	kind, ok := resource.Object["kind"].(string)
+	kind, ok := resource.Object[kind].(string)
 	if !ok {
-		r.errorHandler(instance, err, FailedStatus, "The template has no kind", "")
-		return ctrl.Result{}, nil
+		err := fmt.Errorf("The template has no kind")
+		r.log.Error(err, "", "template", resource.Object, "comName", compInstance.Name)
+		status.State = FailedStatus
+		status.Message = err.Error()
+		return nil
 	}
+	r.log.V(1).Info("Resource kind is: " + kind)
 
-	klog.V(5).Info("Resource kind is: " + kind)
-
-	if err := controllerutil.SetControllerReference(instance, &resource, r.scheme); err != nil {
-		r.errorHandler(instance, err, PendingStatus, "", "")
-		return ctrl.Result{}, err
+	if err := controllerutil.SetControllerReference(compInstance, &resource, r.scheme); err != nil {
+		r.log.Error(err, "SetControllerReference returned error", "resource", resource, "comName", compInstance.Name)
+		status.State = FailedStatus
+		status.Message = err.Error()
+		return nil
 	}
-	found := &unstructured.Unstructured{}
-	found.SetAPIVersion(apiversion)
-	found.SetKind(kind)
-	err = r.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, found)
+	underlyingObj := &unstructured.Unstructured{}
+	underlyingObj.SetAPIVersion(apiversion)
+	underlyingObj.SetKind(kind)
+	namespaced := types.NamespacedName{Name: name, Namespace: namespace}
+	r.log.Info("Get underlying resource", "resource", namespaced, "kind", kind, "apiVersion", apiversion)
+	err = r.Get(context.TODO(), namespaced, underlyingObj)
+	r.log.Info("\n Get returned", "err", err)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			klog.V(5).Infof("Creating resource %s/%s\n", namespace, name)
+			r.log.Info("Creating new underlying resource", "resource", namespaced, "kind", kind, "apiVersion", apiversion)
 			err = r.Create(context.TODO(), &resource)
 			if err != nil {
-				klog.Errorf("Creation of resource %s/%s returned error: %s\n", namespace, name, err.Error())
-				if instance.Status.State != FailedStatus {
-					r.errorHandler(instance, err, FailedStatus, "Failed", "")
-				}
-				return ctrl.Result{}, nil
+				r.log.Error(err, "Cannot create new resource", "resource", namespaced, "kind", kind, "apiVersion", apiversion)
+				status.State = FailedStatus
+				status.Message = err.Error()
+				return err
 			}
 
 			// add watcher
-			err = r.controller.Watch(&source.Kind{Type: found}, &handler.EnqueueRequestForOwner{
+			err = r.controller.Watch(&source.Kind{Type: underlyingObj}, &handler.EnqueueRequestForOwner{
 				IsController: true,
 				OwnerType:    &ibmcloudv1alpha1.Composable{},
 			})
 			if err != nil {
-				r.errorHandler(instance, err, FailedStatus, "", "")
-				return ctrl.Result{}, nil
+				r.log.Error(err, "Cannot add watcher", "resource", namespaced, "kind", kind, "apiVersion", apiversion)
+				status.State = FailedStatus
+				status.Message = err.Error()
+				return err
 			}
 		} else {
-			r.errorHandler(instance, err, FailedStatus, "", "")
-			return ctrl.Result{}, nil
+			r.log.Error(err, "Cannot get resource", "resource", namespaced, "kind", kind, "apiVersion", apiversion)
+			status.State = FailedStatus
+			status.Message = err.Error()
+			return err
 		}
 	} else {
 		// Update the found object and write the result back if there are any changes
-		if !reflect.DeepEqual(resource.Object[spec], found.Object[spec]) {
-			found.Object[spec] = resource.Object[spec]
-			klog.V(5).Infof("Updating Resource %s/%s\n", namespace, name)
-			err = r.Update(context.TODO(), found)
+
+		if !reflect.DeepEqual(resource.Object[spec], underlyingObj.Object[spec]) {
+			underlyingObj.Object[spec] = resource.Object[spec]
+			r.log.Info("Updating underlying resource spec", "currentSpec", resource.Object[spec], "newSpec", underlyingObj.Object[spec], "reso`urce", namespaced, "kind", kind, "apiVersion", apiversion)
+			err = r.Update(context.TODO(), underlyingObj)
 			if err != nil {
-				r.errorHandler(instance, err, FailedStatus, "", "")
-				return ctrl.Result{}, nil
+				status.State = FailedStatus
+				status.Message = err.Error()
+				return err
 			}
 		}
 	}
-	instance.Status.State = OnlineStatus
-	instance.Status.Message = time.Now().Format(time.RFC850)
-	err = r.Update(context.TODO(), instance)
-	if err != nil {
-		if strings.Contains(err.Error(), "ResourceVersion: 0") {
-			// the Composable object was deleted
-			return ctrl.Result{}, nil
-		}
-		if strings.Contains(err.Error(), "the object has been modified") {
-			err = r.Get(context.TODO(), req.NamespacedName, instance)
-			if err == nil {
-				instance.Status.State = OnlineStatus
-				instance.Status.Message = time.Now().Format(time.RFC850)
-				err = r.Update(context.TODO(), instance)
-				if err != nil {
-					klog.Errorf("The second update status returned: %s", err.Error())
-				}
-				return ctrl.Result{}, err
-			}
-			if errors.IsNotFound(err) {
-				// The Composable object was deleted.
-				return ctrl.Result{}, nil
-			}
-
-		}
-		klog.Errorf("Update status returned: %s", err.Error())
-		return ctrl.Result{}, err
-	}
-	return ctrl.Result{}, nil
-
-	//return ctrl.Result{}, nil
+	return nil
 }
 
 // SetupWithManager adds this controller to the manager
@@ -300,32 +318,38 @@ func (r *composableReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return nil
 }
 
-func toJSONFromRaw(content *runtime.RawExtension) (interface{}, error) {
+func (r *composableReconciler) toJSONFromRaw(content *runtime.RawExtension) (interface{}, error) {
 	var data interface{}
 	if err := json.Unmarshal(content.Raw, &data); err != nil {
+		r.log.Error(err, "json.Unmarshal error", "raw data", content.Raw)
 		return nil, err
 	}
 	return data, nil
 }
 
 func (r *composableReconciler) resolve(object interface{}, composableNamespace string) (unstructured.Unstructured, error) {
-	// Set namespace if undefined
 	objMap := object.(map[string]interface{})
 	if _, ok := objMap[metadata]; !ok {
-		return unstructured.Unstructured{}, fmt.Errorf("Failed: Template has no metadata section")
+		err := fmt.Errorf("Failed: Template has no metadata section")
+		r.log.Error(err, "", "object", objMap)
+		return unstructured.Unstructured{}, err
 	}
-	// the underlying object should be created in the same namespace as teh Composable object
+	// the underlying object should be created in the same namespace as the Composable object
 	if metadata, ok := objMap[metadata].(map[string]interface{}); ok {
 		if ns, ok := metadata[namespace]; ok {
 			if composableNamespace != ns {
-				return unstructured.Unstructured{}, fmt.Errorf("Failed: Template defines a wrong namespace %v", ns)
+				err := fmt.Errorf("Failed: Template defines a wrong namespace %v", ns)
+				r.log.Error(err, "", "object", objMap)
+				return unstructured.Unstructured{}, err
 			}
 
 		} else {
 			metadata[namespace] = composableNamespace
 		}
 	} else {
-		return unstructured.Unstructured{}, fmt.Errorf("Failed: Template has an ill-defined metadata section")
+		err := fmt.Errorf("Failed: Template has an ill-defined metadata section")
+		r.log.Error(err, "", "object", objMap)
+		return unstructured.Unstructured{}, err
 	}
 
 	cache := &composableCache{objects: make(map[string]interface{})}
@@ -353,7 +377,9 @@ func (r *composableReconciler) resolveFields(fields interface{}, composableNames
 				} else if values, ok := v.(map[string]interface{}); ok {
 					if value, ok := values[getValueFrom]; ok {
 						if len(values) > 1 {
-							return nil, fmt.Errorf("Failed: Template is ill-formed. GetValueFrom must be the only field in a value")
+							err := fmt.Errorf("Failed: Template is ill-formed. GetValueFrom must be the only field in a value")
+							r.log.Error(err, "resolveFields", "values", values)
+							return nil, err
 						}
 						newFields, err = r.resolveValue(value, composableNamespace, cache)
 					} else {
@@ -395,7 +421,8 @@ func (r *composableReconciler) resolveFields(fields interface{}, composableNames
 func (r *composableReconciler) GetServerPreferredResources() ([]*metav1.APIResourceList, error) {
 	resourceLists, err := r.discoveryClient.ServerPreferredResources()
 	if err != nil {
-		return nil, fmt.Errorf("Error listing api resources, %v", err)
+		r.log.Error(err, "GetServerPreferredResources")
+		return nil, err
 	}
 	return resourceLists, nil
 }
@@ -450,7 +477,8 @@ Loop:
 		// The list holds the GroupVersion for its list of APIResources
 		gv, err := schema.ParseGroupVersion(resourceList.GroupVersion)
 		if err != nil {
-			return nil, fmt.Errorf("Error parsing GroupVersion: %v", err)
+			r.log.Error(err, "Error parsing GroupVersion", "GroupVersion", resourceList.GroupVersion)
+			return nil, err
 		}
 
 		for _, resource := range resourceList.APIResources {
@@ -475,14 +503,17 @@ Loop:
 		}
 	}
 	if !coreGroupObject && len(matchedResources) > 1 {
-		return nil, fmt.Errorf("Multiple resources are matched by %q: %s. A group-qualified plural name must be provided", kind, strings.Join(matchedResources, ", "))
+		err = fmt.Errorf("Multiple resources are matched by %q: %s. A group-qualified plural name must be provided ", kind, strings.Join(matchedResources, ", "))
+		r.log.Error(err, "lookupAPIResource")
+		return nil, err
 	}
 
 	if targetResource != nil {
 		return targetResource, nil
 	}
-
-	return nil, fmt.Errorf("Unable to find api resource named %q", kind)
+	err = fmt.Errorf("Unable to find api resource named %q ", kind)
+	r.log.Error(err, "lookupAPIResource")
+	return nil, err
 }
 
 func (r *composableReconciler) resolveValue(value interface{}, composableNamespace string, cache *composableCache) (interface{}, error) {
@@ -494,7 +525,7 @@ func (r *composableReconciler) resolveValue(value interface{}, composableNamespa
 			}
 			res, err := r.lookupAPIResource(objKind, objGroup)
 			if err != nil {
-				// If an input object API resource is not installed, we return error even if a default value is set.
+				// We cannot resolve input object API resource, so we return error even if a default value is set.
 				return nil, err
 			}
 			if name, ok := val[name].(string); ok {
@@ -519,10 +550,10 @@ func (r *composableReconciler) resolveValue(value interface{}, composableNamespa
 								unstrObj = obj.(unstructured.Unstructured)
 							case toumbstone:
 								// we have checked the object and did not fined it
-								return errorToDefaultValue(val, obj.(toumbstone).err)
+								return r.errorToDefaultValue(val, obj.(toumbstone).err)
 							default:
 								err := fmt.Errorf("wrong type of cached object %T", obj)
-								klog.Errorf("%s", err.Error())
+								r.log.Error(err, "")
 								return nil, err
 							}
 
@@ -530,12 +561,13 @@ func (r *composableReconciler) resolveValue(value interface{}, composableNamespa
 							unstrObj = unstructured.Unstructured{}
 							//unstrObj.SetAPIVersion(res.Version)
 							unstrObj.SetGroupVersionKind(groupVersionKind)
+							r.log.V(1).Info("Get input object", "obj", objNamespacedname, "groupVersionKind", groupVersionKind)
 							err = r.Get(context.TODO(), objNamespacedname, &unstrObj)
 							if err != nil {
-								klog.V(5).Infof("Get object returned %s", err.Error())
+								r.log.Info("Get object returned ", "err", err, "obj", objNamespacedname)
 								cache.objects[key] = toumbstone{err: err}
 								if errors.IsNotFound(err) {
-									return errorToDefaultValue(val, err)
+									return r.errorToDefaultValue(val, err)
 								}
 								return nil, err
 							}
@@ -546,15 +578,16 @@ func (r *composableReconciler) resolveValue(value interface{}, composableNamespa
 						path = path[:1] + objectPrefix + path[1:]
 						err = j.Parse(path)
 						if err != nil {
-							klog.Errorf("jsonpath is %s, error is %s", path, err.Error())
+							r.log.Error(err, "jsonpath.Parse", "path", path)
 							return nil, err
 						}
 						j.AllowMissingKeys(false)
 
 						fullResults, err := j.FindResults(unstrObj)
 						if err != nil {
+							r.log.Error(err, "FindResults", "obj", unstrObj, "path", path)
 							if strings.Contains(err.Error(), "is not found") {
-								errorToDefaultValue(val, err)
+								r.errorToDefaultValue(val, err)
 							}
 							return nil, err
 						}
@@ -562,7 +595,9 @@ func (r *composableReconciler) resolveValue(value interface{}, composableNamespa
 
 						iface, ok := template.PrintableValue(fullResults[0][0])
 						if !ok {
-							return nil, fmt.Errorf("can't print type %s", fullResults[0][0])
+							err = fmt.Errorf("can't find printable value %v ", fullResults[0][0])
+							r.log.Error(err, "template.PrintableValue", "obj", unstrObj, "path", path)
+							return nil, err
 						}
 
 						var retVal interface{}
@@ -577,41 +612,48 @@ func (r *composableReconciler) resolveValue(value interface{}, composableNamespa
 						} else {
 							retVal = iface
 						}
-						klog.V(5).Infof("resolveValue returned %v [%T]\n", retVal, retVal)
 						return retVal, nil
 					}
-					return nil, fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is not jsonpath formated")
-
+					err = fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is not jsonpath formated")
+					r.log.Error(err, "resolveValue", "path", path)
+					return nil, err
 				}
-				return nil, fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is not defined")
+				err = fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is not defined")
+				r.log.Error(err, "resolveValue", "val", val)
+				return nil, err
 			}
-			return nil, fmt.Errorf("Failed: getValueFrom is not well-formed, 'name' is not defined")
-
+			err = fmt.Errorf("Failed: getValueFrom is not well-formed, 'name' is not defined")
+			r.log.Error(err, "resolveValue", "val", val)
+			return nil, err
 		}
-		return "", fmt.Errorf("Failed: getValueFrom is not well-formed, 'kind' is not defined")
+		err := fmt.Errorf("Failed: getValueFrom is not well-formed, 'kind' is not defined")
+		r.log.Error(err, "resolveValue", "val", val)
+		return nil, err
 	}
-	return "", fmt.Errorf("Failed: getValueFrom is not well-formed, its value type is %T", value)
+	err := fmt.Errorf("Failed: getValueFrom is not well-formed, value type is not %T", value)
+	r.log.Error(err, "resolveValue", "value", value)
+	return nil, err
 }
 
-func errorToDefaultValue(val map[string]interface{}, err error) (interface{}, error) {
+func (r *composableReconciler) errorToDefaultValue(val map[string]interface{}, err error) (interface{}, error) {
 	if defaultValue, ok := val[defaultValue]; ok {
-		klog.V(5).Infof("Return default value %v for %+v due to %s \n", defaultValue, val, err.Error())
+		r.log.Info(fmt.Sprintf("Return default value %v for %+v due to %s \n", defaultValue, val, err.Error()))
 		return defaultValue, nil
 	}
 	return nil, err
 }
 
 func getName(obj map[string]interface{}) (string, error) {
-	metadata := obj["metadata"].(map[string]interface{})
-	if name, ok := metadata["name"]; ok {
+	metadata := obj[metadata].(map[string]interface{})
+	if name, ok := metadata[name]; ok {
 		return name.(string), nil
 	}
 	return "", fmt.Errorf("Failed: Template does not contain name")
 }
 
 func getNamespace(obj map[string]interface{}) (string, error) {
-	metadata := obj["metadata"].(map[string]interface{})
-	if namespace, ok := metadata["namespace"]; ok {
+	metadata := obj[metadata].(map[string]interface{})
+	if namespace, ok := metadata[namespace]; ok {
 		return namespace.(string), nil
 	}
 	return "", fmt.Errorf("Failed: Template does not contain namespace")
@@ -625,25 +667,6 @@ func getState(obj map[string]interface{}) (string, error) {
 		return "", fmt.Errorf("Failed: Composable doesn't contain status")
 	}
 	return "", fmt.Errorf("Failed: Composable doesn't contain state")
-}
-
-func (r *composableReconciler) errorHandler(instance *ibmcloudv1alpha1.Composable, err error, status, statusMsg, errMsg string) {
-	if err == nil {
-		return
-	}
-	debug.PrintStack()
-	klog.Errorf("error: %v, message %s", err, errMsg)
-	instance.Status.State = status
-	if statusMsg != "" {
-		instance.Status.Message = statusMsg
-	} else {
-		instance.Status.Message = err.Error()
-	}
-	er := r.Update(context.TODO(), instance)
-	if er != nil {
-		klog.Errorf("Embedded error of updating %s %s/%s, error is %s \n", instance.Kind, instance.Name, instance.Namespace, err.Error())
-
-	}
 }
 
 func objectKey(nn types.NamespacedName, gvk schema.GroupVersionKind) string {

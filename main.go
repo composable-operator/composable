@@ -19,13 +19,16 @@ import (
 	"flag"
 	"os"
 
+	"github.com/go-logr/zapr"
+	"go.uber.org/zap"
+
 	ibmcloudv1alpha1 "github.com/ibm/composable/api/v1alpha1"
 	"github.com/ibm/composable/controllers"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	contrZap "sigs.k8s.io/controller-runtime/pkg/log/zap"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -49,7 +52,7 @@ func main() {
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 	flag.Parse()
 
-	ctrl.SetLogger(zap.Logger(true))
+	ctrl.SetLogger(zapr.NewLogger(contrZap.RawLoggerTo(os.Stderr, true, zap.AddCaller())))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
