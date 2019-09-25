@@ -255,7 +255,6 @@ func (r *composableReconciler) createUnderlyingObject(resource unstructured.Unst
 	namespaced := types.NamespacedName{Name: name, Namespace: namespace}
 	r.log.Info("Get underlying resource", "resource", namespaced, "kind", kind, "apiVersion", apiversion)
 	err = r.Get(context.TODO(), namespaced, underlyingObj)
-	r.log.Info("\n Get returned", "err", err)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			r.log.Info("Creating new underlying resource", "resource", namespaced, "kind", kind, "apiVersion", apiversion)
