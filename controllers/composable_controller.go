@@ -47,15 +47,15 @@ import (
 )
 
 const (
-	getValueFrom   = "getValueFrom"
-	defaultValue   = "defaultValue"
-	name           = "name"
-	path           = "path"
-	namespace      = "namespace"
-	metadata       = "metadata"
-	kind           = "kind"
-	apiVersion     = "apiVersion"
-	group          = "group"
+	getValueFrom = "getValueFrom"
+	defaultValue = "defaultValue"
+	name         = "name"
+	path         = "path"
+	namespace    = "namespace"
+	metadata     = "metadata"
+	kind         = "kind"
+	apiVersion   = "apiVersion"
+	//	group          = "group"
 	spec           = "spec"
 	status         = "status"
 	state          = "state"
@@ -96,7 +96,15 @@ type composableCache struct {
 }
 
 type toumbstone struct {
-	err error
+	err composableError
+}
+
+type composableError struct {
+	error
+	// TODO do we need this state separation
+	isPendable bool
+	// if the error is retrievable the controller will return it to the manager, and teh last will recall Reconcile again
+	isRetrievable bool
 }
 
 // NewReconciler ...
@@ -154,7 +162,7 @@ func (r *composableReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 		}
 		// Set Composable object Status
 		if len(status.State) > 0 &&
-			((status.State != OnlineStatus && reflect.DeepEqual(status, compInstance.Status)) ||
+			((status.State != OnlineStatus && !reflect.DeepEqual(status, compInstance.Status)) ||
 				status.State == OnlineStatus && compInstance.Status.State != OnlineStatus) {
 			r.log.V(1).Info("Set status", "desired status", status, "object", req)
 			compInstance.Status.State = status.State
@@ -185,18 +193,20 @@ func (r *composableReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 		return ctrl.Result{}, nil
 	}
 
-	resource, err := r.resolve(object, compInstance.Namespace)
+	resource, compError := r.resolve(object, compInstance.Namespace)
 
-	if err != nil {
-		// TODO check error and return error value
-		if strings.Contains(err.Error(), FailedStatus) {
-			status.State = FailedStatus
-			status.Message = err.Error()
+	if compError != nil {
+		status.Message = compError.Error()
+		if compError.isPendable {
+			status.State = PendingStatus
 			return ctrl.Result{}, nil
 		}
-		status.State = PendingStatus
-		status.Message = err.Error()
-		return ctrl.Result{}, err
+		status.State = FailedStatus
+		if compError.isRetrievable {
+			return ctrl.Result{}, compError.error
+		}
+		return ctrl.Result{}, nil
+
 	}
 	// if createUnderlyingObject faces with errors, it will update the state
 	status.State = OnlineStatus
@@ -288,9 +298,10 @@ func (r *composableReconciler) createUnderlyingObject(resource unstructured.Unst
 
 		if !reflect.DeepEqual(resource.Object[spec], underlyingObj.Object[spec]) {
 			underlyingObj.Object[spec] = resource.Object[spec]
-			r.log.Info("Updating underlying resource spec", "currentSpec", resource.Object[spec], "newSpec", underlyingObj.Object[spec], "reso`urce", namespaced, "kind", kind, "apiVersion", apiversion)
+			//r.log.Info("Updating underlying resource spec", "currentSpec", resource.Object[spec], "newSpec", underlyingObj.Object[spec], "resource", namespaced, "kind", kind, "apiVersion", apiversion)
 			err = r.Update(context.TODO(), underlyingObj)
 			if err != nil {
+
 				status.State = FailedStatus
 				status.Message = err.Error()
 				return err
@@ -326,12 +337,12 @@ func (r *composableReconciler) toJSONFromRaw(content *runtime.RawExtension) (int
 	return data, nil
 }
 
-func (r *composableReconciler) resolve(object interface{}, composableNamespace string) (unstructured.Unstructured, error) {
+func (r *composableReconciler) resolve(object interface{}, composableNamespace string) (unstructured.Unstructured, *composableError) {
 	objMap := object.(map[string]interface{})
 	if _, ok := objMap[metadata]; !ok {
 		err := fmt.Errorf("Failed: Template has no metadata section")
 		r.log.Error(err, "", "object", objMap)
-		return unstructured.Unstructured{}, err
+		return unstructured.Unstructured{}, &composableError{err, false, false}
 	}
 	// the underlying object should be created in the same namespace as the Composable object
 	if metadata, ok := objMap[metadata].(map[string]interface{}); ok {
@@ -339,7 +350,7 @@ func (r *composableReconciler) resolve(object interface{}, composableNamespace s
 			if composableNamespace != ns {
 				err := fmt.Errorf("Failed: Template defines a wrong namespace %v", ns)
 				r.log.Error(err, "", "object", objMap)
-				return unstructured.Unstructured{}, err
+				return unstructured.Unstructured{}, &composableError{err, false, false}
 			}
 
 		} else {
@@ -348,7 +359,7 @@ func (r *composableReconciler) resolve(object interface{}, composableNamespace s
 	} else {
 		err := fmt.Errorf("Failed: Template has an ill-defined metadata section")
 		r.log.Error(err, "", "object", objMap)
-		return unstructured.Unstructured{}, err
+		return unstructured.Unstructured{}, &composableError{err, false, false}
 	}
 
 	cache := &composableCache{objects: make(map[string]interface{})}
@@ -360,16 +371,17 @@ func (r *composableReconciler) resolve(object interface{}, composableNamespace s
 	return ret, nil
 }
 
-func (r *composableReconciler) resolveFields(fields interface{}, composableNamespace string, cache *composableCache) (interface{}, error) {
+func (r *composableReconciler) resolveFields(fields interface{}, composableNamespace string, cache *composableCache) (interface{}, *composableError) {
 	switch fields.(type) {
 	case map[string]interface{}:
 		if fieldsOut, ok := fields.(map[string]interface{}); ok {
 			for k, v := range fieldsOut {
 				var newFields interface{}
-				var err error
+				var err *composableError
 				if k == getValueFrom {
 					newFields, err = r.resolveValue(v, composableNamespace, cache)
 					if err != nil {
+						r.log.Info("resolveFields resolveValue 1", "err", err)
 						return nil, err
 					}
 					fields = newFields
@@ -378,13 +390,14 @@ func (r *composableReconciler) resolveFields(fields interface{}, composableNames
 						if len(values) > 1 {
 							err := fmt.Errorf("Failed: Template is ill-formed. GetValueFrom must be the only field in a value")
 							r.log.Error(err, "resolveFields", "values", values)
-							return nil, err
+							return nil, &composableError{err, false, false}
 						}
 						newFields, err = r.resolveValue(value, composableNamespace, cache)
 					} else {
 						newFields, err = r.resolveFields(values, composableNamespace, cache)
 					}
 					if err != nil {
+						r.log.Info("resolveFields resolveValue 2", "err", err)
 						return nil, err
 					}
 					fieldsOut[k] = newFields
@@ -416,28 +429,13 @@ func (r *composableReconciler) resolveFields(fields interface{}, composableNames
 	return fields, nil
 }
 
-// GetServerPreferredResources returns preferred API resources
-func (r *composableReconciler) GetServerPreferredResources() ([]*metav1.APIResourceList, error) {
-	resourceLists, err := r.discoveryClient.ServerPreferredResources()
-	if err != nil {
-		r.log.Error(err, "GetServerPreferredResources")
-		return nil, err
-	}
-	return resourceLists, nil
-}
-
-// NameMatchesResource checks if the given resource name/kind and group matches with API resource and its group
-func NameMatchesResource(name string, objGroup string, resource metav1.APIResource, resGroup string) bool {
-	lowerCaseName := strings.ToLower(name)
-	if len(objGroup) > 0 {
-		if objGroup == resGroup &&
-			(lowerCaseName == resource.Name ||
-				lowerCaseName == resource.SingularName ||
-				lowerCaseName == strings.ToLower(resource.Kind)) {
-			return true
-		}
+// NameMatchesResource checks if the given resource name/kind matches with API resource and its group
+func NameMatchesResource(kind string, resource metav1.APIResource, resGroup string) bool {
+	if strings.Contains(resource.Name, "/") {
+		// subresource
 		return false
 	}
+	lowerCaseName := strings.ToLower(kind)
 	if lowerCaseName == resource.Name ||
 		lowerCaseName == resource.SingularName ||
 		lowerCaseName == strings.ToLower(resource.Kind) ||
@@ -460,14 +458,25 @@ func groupQualifiedName(name, group string) string {
 	return fmt.Sprintf("%s.%s", name, group)
 }
 
-func (r *composableReconciler) lookupAPIResource(objKind, objGroup string) (*metav1.APIResource, error) {
+func (r *composableReconciler) lookupAPIResource(objKind, apiVersion string) (*metav1.APIResource, *composableError) {
+	//r.log.V(1).Info("lookupAPIResource", "objKind", objKind, "apiVersion", apiVersion)
 	var resources []*metav1.APIResourceList
-
-	resources, err := r.GetServerPreferredResources()
-	if err != nil {
-		return nil, err
+	var err error
+	if len(apiVersion) > 0 {
+		list, err := r.discoveryClient.ServerResourcesForGroupVersion(apiVersion)
+		if err != nil {
+			r.log.Error(err, "lookupAPIResource", "apiVersion", apiVersion)
+			return nil, &composableError{err, false, true}
+		}
+		resources = []*metav1.APIResourceList{list}
+		//	r.log.V(1).Info("lookupAPIResource", "list", list, "apiVersion", apiVersion)
+	} else {
+		resources, err = r.discoveryClient.ServerPreferredResources()
+		if err != nil {
+			r.log.Error(err, "lookupAPIResource ServerPreferredResources")
+			return nil, &composableError{err, false, true}
+		}
 	}
-
 	var targetResource *metav1.APIResource
 	var matchedResources []string
 	coreGroupObject := false
@@ -477,13 +486,13 @@ Loop:
 		gv, err := schema.ParseGroupVersion(resourceList.GroupVersion)
 		if err != nil {
 			r.log.Error(err, "Error parsing GroupVersion", "GroupVersion", resourceList.GroupVersion)
-			return nil, err
+			return nil, &composableError{err, false, true}
 		}
 
 		for _, resource := range resourceList.APIResources {
 			group := gv.Group
-			if NameMatchesResource(objKind, objGroup, resource, group) {
-				if len(group) == 0 && len(objGroup) == 0 {
+			if NameMatchesResource(objKind, resource, group) {
+				if len(group) == 0 && len(apiVersion) == 0 {
 					// K8s core group object
 					coreGroupObject = true
 					targetResource = resource.DeepCopy()
@@ -504,7 +513,7 @@ Loop:
 	if !coreGroupObject && len(matchedResources) > 1 {
 		err = fmt.Errorf("Multiple resources are matched by %q: %s. A group-qualified plural name must be provided ", kind, strings.Join(matchedResources, ", "))
 		r.log.Error(err, "lookupAPIResource")
-		return nil, err
+		return nil, &composableError{err, false, false}
 	}
 
 	if targetResource != nil {
@@ -512,20 +521,22 @@ Loop:
 	}
 	err = fmt.Errorf("Unable to find api resource named %q ", kind)
 	r.log.Error(err, "lookupAPIResource")
-	return nil, err
+	return nil, &composableError{err, false, false}
 }
 
-func (r *composableReconciler) resolveValue(value interface{}, composableNamespace string, cache *composableCache) (interface{}, error) {
+func (r *composableReconciler) resolveValue(value interface{}, composableNamespace string, cache *composableCache) (interface{}, *composableError) {
+	//r.log.Info("resolveValue", "value", value)
+	var err error
 	if val, ok := value.(map[string]interface{}); ok {
 		if objKind, ok := val[kind].(string); ok {
-			objGroup := ""
-			if objGroup, ok = val[group].(string); !ok {
-				objGroup = ""
+			apiversion := ""
+			if apiversion, ok = val[apiVersion].(string); !ok {
+				apiversion = ""
 			}
-			res, err := r.lookupAPIResource(objKind, objGroup)
-			if err != nil {
+			res, compErr := r.lookupAPIResource(objKind, apiversion)
+			if compErr != nil {
 				// We cannot resolve input object API resource, so we return error even if a default value is set.
-				return nil, err
+				return nil, compErr
 			}
 			if name, ok := val[name].(string); ok {
 				if path, ok := val[path].(string); ok {
@@ -548,12 +559,18 @@ func (r *composableReconciler) resolveValue(value interface{}, composableNamespa
 							case unstructured.Unstructured:
 								unstrObj = obj.(unstructured.Unstructured)
 							case toumbstone:
-								// we have checked the object and did not fined it
-								return r.errorToDefaultValue(val, obj.(toumbstone).err)
+								ts := obj.(toumbstone)
+								if errors.IsNotFound(ts.err.error) {
+									// we have checked the object and did not fined it
+									val, err1 := r.errorToDefaultValue(val, ts.err)
+									return val, err1
+								}
+								// we should not be here
+								return nil, &ts.err
 							default:
-								err := fmt.Errorf("wrong type of cached object %T", obj)
+								err = fmt.Errorf("wrong type of cached object %T", obj)
 								r.log.Error(err, "")
-								return nil, err
+								return nil, &composableError{err, false, false}
 							}
 
 						} else {
@@ -564,11 +581,12 @@ func (r *composableReconciler) resolveValue(value interface{}, composableNamespa
 							err = r.Get(context.TODO(), objNamespacedname, &unstrObj)
 							if err != nil {
 								r.log.Info("Get object returned ", "err", err, "obj", objNamespacedname)
-								cache.objects[key] = toumbstone{err: err}
+								compErr = &composableError{err, true, true}
+								cache.objects[key] = toumbstone{err: *compErr}
 								if errors.IsNotFound(err) {
-									return r.errorToDefaultValue(val, err)
+									return r.errorToDefaultValue(val, *compErr)
 								}
-								return nil, err
+								return nil, compErr
 							}
 							cache.objects[key] = unstrObj
 						}
@@ -578,7 +596,7 @@ func (r *composableReconciler) resolveValue(value interface{}, composableNamespa
 						err = j.Parse(path)
 						if err != nil {
 							r.log.Error(err, "jsonpath.Parse", "path", path)
-							return nil, err
+							return nil, &composableError{err, false, false}
 						}
 						j.AllowMissingKeys(false)
 
@@ -586,9 +604,11 @@ func (r *composableReconciler) resolveValue(value interface{}, composableNamespa
 						if err != nil {
 							r.log.Error(err, "FindResults", "obj", unstrObj, "path", path)
 							if strings.Contains(err.Error(), "is not found") {
-								r.errorToDefaultValue(val, err)
+								val1, err1 := r.errorToDefaultValue(val, composableError{err, true, true})
+								r.log.Info("resolveValue 3", "val", val1, "err", err1)
+								return val, err1
 							}
-							return nil, err
+							return nil, &composableError{err, false, false}
 						}
 						// TODO check default
 
@@ -596,7 +616,7 @@ func (r *composableReconciler) resolveValue(value interface{}, composableNamespa
 						if !ok {
 							err = fmt.Errorf("can't find printable value %v ", fullResults[0][0])
 							r.log.Error(err, "template.PrintableValue", "obj", unstrObj, "path", path)
-							return nil, err
+							return nil, &composableError{err, false, false}
 						}
 
 						var retVal interface{}
@@ -613,33 +633,32 @@ func (r *composableReconciler) resolveValue(value interface{}, composableNamespa
 						}
 						return retVal, nil
 					}
-					err = fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is not jsonpath formated")
+					err = fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is not jsonpath formated ")
 					r.log.Error(err, "resolveValue", "path", path)
-					return nil, err
+					return nil, &composableError{err, false, false}
 				}
-				err = fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is not defined")
+				err = fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is not defined ")
 				r.log.Error(err, "resolveValue", "val", val)
-				return nil, err
+				return nil, &composableError{err, false, false}
 			}
-			err = fmt.Errorf("Failed: getValueFrom is not well-formed, 'name' is not defined")
+			err = fmt.Errorf("Failed: getValueFrom is not well-formed, 'name' is not defined ")
 			r.log.Error(err, "resolveValue", "val", val)
-			return nil, err
+			return nil, &composableError{err, false, false}
 		}
-		err := fmt.Errorf("Failed: getValueFrom is not well-formed, 'kind' is not defined")
+		err = fmt.Errorf("Failed: getValueFrom is not well-formed, 'kind' is not defined ")
 		r.log.Error(err, "resolveValue", "val", val)
-		return nil, err
+		return nil, &composableError{err, false, false}
 	}
-	err := fmt.Errorf("Failed: getValueFrom is not well-formed, value type is not %T", value)
+	err = fmt.Errorf("Failed: getValueFrom is not well-formed, value type is not %T ", value)
 	r.log.Error(err, "resolveValue", "value", value)
-	return nil, err
+	return nil, &composableError{err, false, false}
 }
 
-func (r *composableReconciler) errorToDefaultValue(val map[string]interface{}, err error) (interface{}, error) {
+func (r *composableReconciler) errorToDefaultValue(val map[string]interface{}, err composableError) (interface{}, *composableError) {
 	if defaultValue, ok := val[defaultValue]; ok {
-		r.log.Info(fmt.Sprintf("Return default value %v for %+v due to %s \n", defaultValue, val, err.Error()))
 		return defaultValue, nil
 	}
-	return nil, err
+	return nil, &err
 }
 
 func getName(obj map[string]interface{}) (string, error) {

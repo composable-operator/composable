@@ -1,0 +1,25 @@
+apiVersion: ibmcloud.ibm.com/v1alpha1
+kind: Composable
+metadata:
+  name: api-error
+spec:
+  template: 
+    apiVersion: "test.ibmcloud.ibm.com/v1"
+    kind: OutputValueError
+    metadata:
+      name: services-out-error
+    spec:
+      instancename: services-out-error
+      k8sValue:
+        getValueFrom:
+          kind: OutputValue
+          name: test-service
+          namespace: default
+          path: '{.spec.stringValue}'
+          defaultValue: None
+
+
+
+
+
+
