@@ -39,53 +39,6 @@ var (
 	stop chan struct{}
 )
 
-//func TestComposable(t *testing.T) {
-//	klog.InitFlags(flag.CommandLine)
-//	klog.SetOutput(GinkgoWriter)
-//
-//	RegisterFailHandler(Fail)
-//	SetDefaultEventuallyPollingInterval(1 * time.Second)
-//	SetDefaultEventuallyTimeout(60 * time.Second)
-//
-//	RunSpecs(t, "Composable Suite")
-//}
-
-/*
-var _ = BeforeSuite(func() {
-
-	testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{filepath.Join("..", "..", "config", "crds"),
-			filepath.Join("./testdata", "crds")},
-		ControlPlaneStartTimeout: 2 * time.Minute,
-	}
-	api.AddToScheme(scheme.Scheme)
-
-	var err error
-	var cfg *rest.Config
-	if cfg, err = testEnv.Start(); err != nil {
-		log.Fatal(err)
-	}
-
-	syncPeriod := 30 * time.Second // set a sync period
-	mgr, err := manager.New(cfg, manager.Options{SyncPeriod: &syncPeriod})
-	Expect(err).NotTo(HaveOccurred())
-
-	client := mgr.GetClient()
-
-	recFn := newReconciler(mgr)
-	Expect(add(mgr, recFn)).NotTo(HaveOccurred())
-	stop = test.StartTestManager(mgr)
-	testNs := test.SetupKubeOrDie(cfg, "test-ns-")
-	testContext = test.NewTestContext(client, testNs)
-
-})
-
-var _ = AfterSuite(func() {
-	close(stop)
-	testEnv.Stop()
-})
-*/
-
 var _ = Describe("test Composable operations", func() {
 	dataDir := "testdata/"
 	unstrObj := unstructured.Unstructured{}
@@ -296,9 +249,8 @@ var _ = Describe("test Composable operations", func() {
 
 var _ = Describe("Validate group separation", func() {
 	Context("There are 3 groups that have Kind = `Service`. They are: Service/v1; Service.ibmcloud.ibm.com/v1alpha1 and Service.test.ibmcloud.ibm.com/v1", func() {
-		It("Composable should correctly discover required objects", func() {
-			dataDir := "testdata/"
-
+		dataDir := "testdata/"
+		BeforeEach(func() {
 			By("deploy K8s Service")
 			kubeObj := test.LoadObject(dataDir+"serviceK8s.yaml", &v1.Service{})
 			test.CreateObject(testContext, kubeObj, false, 0)
@@ -308,8 +260,23 @@ var _ = Describe("Validate group separation", func() {
 			tObj := test.LoadObject(dataDir+"serviceTest.yaml", &unstructured.Unstructured{})
 			test.CreateObject(testContext, tObj, false, 0)
 			Eventually(test.GetObject(testContext, tObj)).ShouldNot(BeNil())
+		})
 
-			By("deploy Composable object")
+		AfterEach(func() {
+			By("delete K8s Service")
+			kubeObj := test.LoadObject(dataDir+"serviceK8s.yaml", &v1.Service{})
+			test.DeleteObject(testContext, kubeObj, false)
+			Eventually(test.GetObject(testContext, kubeObj)).Should(BeNil())
+
+			By("delete test Service")
+			tObj := test.LoadObject(dataDir+"serviceTest.yaml", &unstructured.Unstructured{})
+			test.DeleteObject(testContext, tObj, false)
+			Eventually(test.GetObject(testContext, tObj)).Should(BeNil())
+		})
+
+		It("Composable should correctly discover required objects, core service without apiVersion", func() {
+
+			By("deploy Composable object " + "compServices.yaml")
 			comp := test.LoadCompasable(dataDir + "compServices.yaml")
 			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
@@ -326,6 +293,51 @@ var _ = Describe("Validate group separation", func() {
 
 			Ω(testSpec["k8sValue"]).Should(Equal("None"))
 			Ω(testSpec["testValue"]).Should(Equal("Test"))
+		})
+
+		It("Composable should correctly discover required objects, , core service with apiVersion=v1", func() {
+
+			By("deploy K8s Service")
+			kubeObj := test.LoadObject(dataDir+"serviceK8s.yaml", &v1.Service{})
+			test.CreateObject(testContext, kubeObj, false, 0)
+			Eventually(test.GetObject(testContext, kubeObj)).ShouldNot(BeNil())
+
+			By("deploy test Service")
+			tObj := test.LoadObject(dataDir+"serviceTest.yaml", &unstructured.Unstructured{})
+			test.CreateObject(testContext, tObj, false, 0)
+			Eventually(test.GetObject(testContext, tObj)).ShouldNot(BeNil())
+
+			By("deploy Composable object " + "compServicesV1.yaml")
+			comp := test.LoadCompasable(dataDir + "compServicesV1.yaml")
+			test.PostInNs(testContext, &comp, false, 0)
+			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
+
+			By("get the output object and validate its fields")
+			unstrObj := unstructured.Unstructured{}
+			gvk := schema.GroupVersionKind{Kind: "OutputValue", Version: "v1", Group: "test.ibmcloud.ibm.com"}
+			objNamespacedname := types.NamespacedName{Namespace: testContext.Namespace(), Name: "services-out-v1"}
+
+			unstrObj.SetGroupVersionKind(gvk)
+			Eventually(test.GetUnstructuredObject(testContext, objNamespacedname, &unstrObj)).Should(Succeed())
+			testSpec, ok := unstrObj.Object[spec].(map[string]interface{})
+			Ω(ok).Should(BeTrue())
+
+			Ω(testSpec["k8sValue"]).Should(Equal("None"))
+			Ω(testSpec["testValue"]).Should(Equal("Test"))
+		})
+
+		It("Composable should fail to discover correct Service recource", func() {
+
+			By("deploy Composable object " + "compAPIError.yaml")
+			comp := test.LoadCompasable(dataDir + "compAPIError.yaml")
+			test.PostInNs(testContext, &comp, false, 0)
+			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
+
+			By("Reload the Composable object")
+			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
+
+			By("validate that Composable object status is FailedStatus")
+			Eventually(test.GetState(testContext, &comp)).Should(Equal(FailedStatus))
 
 		})
 

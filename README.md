@@ -186,7 +186,7 @@ The `getValueFrom` element should be a single child of the parent element and ca
 Filed | Is required | Format/Type | Comments
 ----- | ------------|-------------|-----------------
  kind | Yes | String | Kind of the input object
- group | No | String | Defines a K8s Api group of the checking object. Helps to resolve conflicts, when the same `Kind` defined in several groups
+ apiVersion | No | String | Defines a K8s Api group and version of the checking object. Helps to resolve conflicts, when the same `Kind` defined in several API groups and there are several supported API versions
  name | Yes | String | Name of the input object
  namespace | No | String | Namespace of the input object, if isn't defined, the ns of the `Composable` operator will be checked
  path | Yes | String | The `jsonpath` formatted path to the checked filed
