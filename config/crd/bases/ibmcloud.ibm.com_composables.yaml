@@ -32,6 +32,7 @@ spec:
   subresources: {}
   validation:
     openAPIV3Schema:
+      description: Composable represents a composable resource in solsa programming
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation

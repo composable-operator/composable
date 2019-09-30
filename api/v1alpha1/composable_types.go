@@ -69,6 +69,16 @@ type ComposableList struct {
 	Items           []Composable `json:"items"`
 }
 
+//ComposableGetValueFrom is the struct for Composable getValueFrom
+type ComposableGetValueFrom struct {
+	Kind               string `json:"kind"`
+	Group              string `json:"group"`
+	Name               string `json:"name"`
+	Namespace          string `json:"namespace,omitempty"`
+	Path               string `json:"path"`
+	FormatTransformers string `json:"format-transformers,omitempty"`
+}
+
 func init() {
 	SchemeBuilder.Register(&Composable{}, &ComposableList{})
 }
