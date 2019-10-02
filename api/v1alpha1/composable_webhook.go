@@ -67,7 +67,7 @@ func (r *Composable) ValidateCreate() error {
 	composablelog.Info("validate create", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object creation.
-	return r.validateComposable()
+	return r.validateComposable("CREATE")
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
@@ -75,7 +75,7 @@ func (r *Composable) ValidateUpdate(old runtime.Object) error {
 	composablelog.Info("validate update", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object update.
-	return r.validateComposable()
+	return r.validateComposable("UPDATE")
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
@@ -87,7 +87,7 @@ func (r *Composable) ValidateDelete() error {
 }
 
 // validateComposable validates the spec.template of the request
-func (r *Composable) validateComposable() error {
+func (r *Composable) validateComposable(operation string) error {
 	composablelog.Info("validateComposable", "name", r.Name)
 	allErrs := r.validateAPIVersionKind(r.Spec.Template, field.NewPath("spec").Child("template"))
 	m, err := r.validate(r.Spec.Template, field.NewPath("spec").Child("template"))
@@ -98,7 +98,7 @@ func (r *Composable) validateComposable() error {
 		return apierrors.NewInvalid(schema.GroupKind{Group: "ibmcloud.ibm.com", Kind: "Composable"}, r.Name, allErrs)
 	}
 
-	if err := r.dryRun(m); err != nil {
+	if err := r.dryRun(m, operation); err != nil {
 		allErrs = append(allErrs, err)
 		return apierrors.NewInvalid(schema.GroupKind{Group: "ibmcloud.ibm.com", Kind: "Composable"}, r.Name, allErrs)
 	}
@@ -236,7 +236,7 @@ func array2string(a []string) string {
 }
 
 // dryrun as a means of syntax validation of the template content
-func (r *Composable) dryRun(m map[string]interface{}) *field.Error {
+func (r *Composable) dryRun(m map[string]interface{}, op string) *field.Error {
 	composablelog.Info("dryRun", "name", r.Name)
 	newM, _ := json.Marshal(m)
 	composablelog.Info("embedded request", "new", string(newM))
@@ -252,9 +252,19 @@ func (r *Composable) dryRun(m map[string]interface{}) *field.Error {
 	composablelog.Info("dry-run", "obj", u.Object)
 	composablelog.Info("dry-run", "apiversion", u.GetAPIVersion(), "kind", u.GetKind())
 
-	if err = cl.Create(context.TODO(), &u, client.CreateDryRunAll); err != nil {
-		composablelog.Info("dry-run failed", "err", err.Error())
-		return field.Invalid(field.NewPath("spec").Child("template"), r.Name, err.Error())
+	if op == "CREATE" {
+		composablelog.Info("create dry-run is called")
+		if err = cl.Create(context.TODO(), &u, client.CreateDryRunAll); err != nil {
+			composablelog.Info("create dry-run failed", "err", err.Error())
+			return field.Invalid(field.NewPath("spec").Child("template"), r.Name, err.Error())
+		}
+	}
+	if op == "UPDATE" {
+		composablelog.Info("update dry-run is called")
+		if err = cl.Update(context.TODO(), &u, client.UpdateDryRunAll); err != nil {
+			composablelog.Info("update dry-run failed", "err", err.Error())
+			return field.Invalid(field.NewPath("spec").Child("template"), r.Name, err.Error())
+		}
 	}
 	composablelog.Info("dry-run passed")
 	return nil
