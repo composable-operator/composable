@@ -23,5 +23,8 @@ kubectl delete --wait crd composables.ibmcloud.ibm.com
 # Delete all clusterwide resources for the operator
 kubectl delete clusterrole,clusterrolebinding -l app.kubernetes.io/name=composable-operator  
 
+# Delete admission control webhook configs
+kubectl delete validatingwebhookconfiguration,mutatingwebhookconfiguration -l app.kubernetes.io/name=composable-operator  
+
 # delete all namespaced resources
 kubectl delete ns -l app.kubernetes.io/name=composable-operator
