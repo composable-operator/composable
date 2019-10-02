@@ -247,7 +247,7 @@ var _ = Describe("test Composable operations", func() {
 	})
 })
 
-var _ = Describe("Validate group separation", func() {
+var _ = Describe("Validate input objects Api grop and version discovery", func() {
 	Context("There are 3 groups that have Kind = `Service`. They are: Service/v1; Service.ibmcloud.ibm.com/v1alpha1 and Service.test.ibmcloud.ibm.com/v1", func() {
 		dataDir := "testdata/"
 		BeforeEach(func() {
@@ -297,15 +297,15 @@ var _ = Describe("Validate group separation", func() {
 
 		It("Composable should correctly discover required objects, , core service with apiVersion=v1", func() {
 
-			By("deploy K8s Service")
-			kubeObj := test.LoadObject(dataDir+"serviceK8s.yaml", &v1.Service{})
-			test.CreateObject(testContext, kubeObj, false, 0)
-			Eventually(test.GetObject(testContext, kubeObj)).ShouldNot(BeNil())
-
-			By("deploy test Service")
-			tObj := test.LoadObject(dataDir+"serviceTest.yaml", &unstructured.Unstructured{})
-			test.CreateObject(testContext, tObj, false, 0)
-			Eventually(test.GetObject(testContext, tObj)).ShouldNot(BeNil())
+			//By("deploy K8s Service")
+			//kubeObj := test.LoadObject(dataDir+"serviceK8s.yaml", &v1.Service{})
+			//test.CreateObject(testContext, kubeObj, false, 0)
+			//Eventually(test.GetObject(testContext, kubeObj)).ShouldNot(BeNil())
+			//
+			//By("deploy test Service")
+			//tObj := test.LoadObject(dataDir+"serviceTest.yaml", &unstructured.Unstructured{})
+			//test.CreateObject(testContext, tObj, false, 0)
+			//Eventually(test.GetObject(testContext, tObj)).ShouldNot(BeNil())
 
 			By("deploy Composable object " + "compServicesV1.yaml")
 			comp := test.LoadCompasable(dataDir + "compServicesV1.yaml")
@@ -326,10 +326,24 @@ var _ = Describe("Validate group separation", func() {
 			Ω(testSpec["testValue"]).Should(Equal("Test"))
 		})
 
-		It("Composable should fail to discover correct Service recource", func() {
+		It("Composable should fail to discover correct Service recourse, when there are several groups with the same Kind", func() {
 
 			By("deploy Composable object " + "compAPIError.yaml")
 			comp := test.LoadCompasable(dataDir + "compAPIError.yaml")
+			test.PostInNs(testContext, &comp, false, 0)
+			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
+
+			By("Reload the Composable object")
+			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
+
+			By("validate that Composable object status is FailedStatus")
+			Eventually(test.GetState(testContext, &comp)).Should(Equal(FailedStatus))
+
+		})
+		It("Composable should fail to discover correct Service recourse, when a wring API version is provided", func() {
+
+			By("deploy Composable object " + "compAPIWrongVersionError.yaml")
+			comp := test.LoadCompasable(dataDir + "compAPIWrongVersionError.yaml")
 			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 
