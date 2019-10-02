@@ -17,6 +17,7 @@
 
 set -e
 
+# check if cert-manager is installed
 echo "checking the prerequisite cert-manager ... "
 CERT=$(kubectl get crd | grep -c ^certificates.certmanager.k8s.io)
 CERTREQ=$(kubectl get crd | grep -c ^certificaterequests.certmanager.k8s.io)
