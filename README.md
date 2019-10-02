@@ -9,13 +9,15 @@
     - [An example when a Kubernetes `ConfigMap` created based on a Kubernetes Service](#an-example-when-a-kubernetes-configmap-created-based-on-a-kubernetes-service)
     - [An example of Service.ibmcloud.ibm.com](#an-example-of-serviceibmcloudibmcom)
   - [getValueFrom elements](#getvaluefrom-elements)
+  - [The input object group and version discovery algorithm](#the-input-object-group-and-version-discovery-algorithm)
   - [Format transformers](#format-transformers)
   - [Namespaces](#namespaces)
   - [Deletion](#deletion)
   - [Field path discovery](#field-path-discovery)
     - [Limitations](#limitations)
 
-<!-- END ` generated TOC please keep comment here to allow auto update -->
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 
 *Note:* The project uses Golang modules, in order to  activate module support, please set the the `GO111MODULE` 
 environment variable to `on`. [How to Install and Activate Module Support](https://github.com/golang/go/wiki/Modules#how-to-install-and-activate-module-support)
@@ -181,6 +183,7 @@ spec:
  the `path` element, which is a string with dots as a delimiter. 
  
 ## getValueFrom elements
+
 The `getValueFrom` element should be a single child of the parent element and can contain the following sub-fileds:
 
 Filed | Is required | Format/Type | Comments
@@ -191,6 +194,15 @@ Filed | Is required | Format/Type | Comments
  namespace | No | String | Namespace of the input object, if isn't defined, the ns of the `Composable` operator will be checked
  path | Yes | String | The `jsonpath` formatted path to the checked filed
  format-transformers | No | Array of predefined strings | Used for value type transformation, see [Format transformers](#format-transformers)
+
+## The input object group and version discovery algorithm
+
+* If `apiVersion` of the input object is specified, Composable controller will try to discover an input object with the given group and version. 
+	* If the given Kind is not part of the provided group, an error will be generated, despite of the Kind existence in other groups.
+	* If the provided version is not supported, an error will be generated, despite of other versions existence.
+	* Kubernetes core objects don't have group, so only version should be specified, e.g. `v1`.
+* If `apiVersion` is not provided and the given Kind is part of the Kubernetes core group, the core group will be used, despite of the Kind existence in other groups.
+* If `apiVersion` is not provided and the given Kind exists in several groups, and doesn't exist in the Kuberntes Core group, an error will be generated. 
 
 ## Format transformers
 
@@ -245,7 +257,22 @@ If the user deletes the underlying object manually, it is automatically recreate
 We use a `jsonpath` parser from `go-client` to define path to the resolving files. Here some examples:
 
 * `{.data.key-name}` - returns a path to the key named `key-name` from a `ConfigMap` or from a `Secret`
-* `{.spec.ports[?(@.name==“http”)].port}}` - takes port value from a port named `http` from the `ports` array
+* `{.spec.ports[?(@.name==“http”)].port}}` - takes port value from a port named `http` from the `ports` array`
+
+If one of the element names, e.g. a key in a `ConfigMap` or `Secret`, contains dots, the dots should be escaped. 
+For example, if we have the following Secret definition:
+```yaml
+apiVersion: v1
+data:
+  tls.crt: base64data
+  tls.key: base64data
+kind: Secret
+metadata:
+  name: data-center
+  namespace: default
+type: Opaque
+``` 
+In order to access the `tls.key` data, the jsonpath should be `'{.data.tls\.key}'`
 
 ### Limitations
 
