@@ -3,7 +3,7 @@ kind: Composable
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"
-  name: mycomp
+  name: testcomp
 spec:
   template: 
     apiVersion: v1
@@ -17,7 +17,7 @@ spec:
           kind: Secret
           name: dallascluster
           namespace: default
-          path: '{.data."tls.key"}'
+          path: '{.data.tls\.key}'
           format-transformers:
           - "Base64ToString"      
       dockerconfig:
@@ -25,6 +25,6 @@ spec:
           kind: Secret
           name: default-icr-io
           namespace: default
-          path: '{.data.".dockerconfigjson"}'
+          path: '{.data.\.dockerconfigjson}'
           format-transformers:
           - "Base64ToString"
