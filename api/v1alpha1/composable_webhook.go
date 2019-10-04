@@ -34,7 +34,14 @@ import (
 )
 
 // log is for logging in this package.
-var composablelog = logf.Log.WithName("composable-resource")
+var composablelog = logf.Log.WithName("controllers").WithName("Composable-webhook")
+
+const (
+	// OperationCreate - name of create operation
+	OperationCreate = "CREATE"
+	// OperationUpdate - name of update operation
+	OperationUpdate = "UPDATE"
+)
 
 // SetupWebhookWithManager sets up the webhooks with the manager
 func (r *Composable) SetupWebhookWithManager(mgr ctrl.Manager) error {
@@ -65,17 +72,13 @@ var _ webhook.Validator = &Composable{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *Composable) ValidateCreate() error {
 	composablelog.Info("validate create", "name", r.Name)
-
-	// TODO(user): fill in your validation logic upon object creation.
-	return r.validateComposable("CREATE")
+	return r.validateComposable(OperationCreate)
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *Composable) ValidateUpdate(old runtime.Object) error {
 	composablelog.Info("validate update", "name", r.Name)
-
-	// TODO(user): fill in your validation logic upon object update.
-	return r.validateComposable("UPDATE")
+	return r.validateComposable(OperationUpdate)
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
@@ -105,25 +108,24 @@ func (r *Composable) validateComposable(operation string) error {
 	return nil
 }
 
-// validate the template content for required fields of apiVersion and kind
+// validateAPIVersionKind validates the template content for required fields of apiVersion and kind
 func (r *Composable) validateAPIVersionKind(template *runtime.RawExtension, fieldpath *field.Path) field.ErrorList {
 	var f interface{}
 	json.Unmarshal(template.Raw, &f)
 	m := f.(map[string]interface{})
 	var allErrs field.ErrorList
 
-	if m["apiVersion"] == nil || m["apiVersion"].(string) == "" {
-		composablelog.Info("validateApiVersionKind - apiVersion is empty")
+	if m["apiVersion"] == nil || len(m["apiVersion"].(string)) == 0 {
 		allErrs = append(allErrs, field.Invalid(fieldpath.Child("apiVersion"), r.Name, "Missing required field - apiVersion"))
 	}
-	if m["kind"] == nil || m["kind"].(string) == "" {
+	if m["kind"] == nil || len(m["kind"].(string)) == 0 {
 		composablelog.Info("validateApiVersionKind - kind is empty")
 		allErrs = append(allErrs, field.Invalid(fieldpath.Child("kind"), r.Name, "Missing required field - kind"))
 	}
 	return allErrs
 }
 
-// validate the template content in the spec
+// validate validates the template for the required fields of getValueFrom
 func (r *Composable) validate(template *runtime.RawExtension, fieldpath *field.Path) (map[string]interface{}, field.ErrorList) {
 	var f interface{}
 	json.Unmarshal(template.Raw, &f)
@@ -145,19 +147,11 @@ func (r *Composable) findGetValueFrom(path *field.Path, m map[string]interface{}
 			}
 		case map[string]interface{}:
 			if vv["getValueFrom"] != nil {
-				newM, _ := json.Marshal(vv["getValueFrom"])
-				myGetValueFrom := ComposableGetValueFrom{}
-				json.Unmarshal(newM, &myGetValueFrom)
-				composablelog.Info("found getValueFrom", "key", "getValueFrom", "value", vv["getValueFrom"])
-				if err := validateGetValueFrom(mykey.String(), myGetValueFrom); err != nil {
-					composablelog.Info("getValueFrom is INVALID", "detail", err)
+				if err := validateGetValueFrom(vv["getValueFrom"]); err != nil {
 					allErrs = append(allErrs, field.Invalid(mykey.Child("getValueFrom"), r.Name, err.Error()))
 				}
-				composablelog.Info("getValueFrom is valid")
-				//set to a random value for dry-run
 				// TODO: set the value to an appropriate type e.g. int, string, etc
 				m[k] = "abc"
-
 			} else { //recursive checking the sub-elements
 				if err := r.findGetValueFrom(mykey, vv); err != nil {
 					allErrs = append(allErrs, err...)
@@ -184,15 +178,9 @@ func (r *Composable) findGetValueFrom2(path *field.Path, m []interface{}) field.
 			}
 		case map[string]interface{}:
 			if vv["getValueFrom"] != nil {
-				newM, _ := json.Marshal(vv["getValueFrom"])
-				myGetValueFrom := ComposableGetValueFrom{}
-				json.Unmarshal(newM, &myGetValueFrom)
-				composablelog.Info("found getValueFrom", "key", "getValueFrom", "value", vv["getValueFrom"])
-				if err := validateGetValueFrom(mykey.String(), myGetValueFrom); err != nil {
-					composablelog.Info("getValueFrom is INVALID", "detail", err)
+				if err := validateGetValueFrom(vv["getValueFrom"]); err != nil {
 					allErrs = append(allErrs, field.Invalid(mykey.Child("getValueFrom"), r.Name, err.Error()))
 				}
-				composablelog.Info("getValueFrom is valid")
 				// TODO: set a random value of appropriate type for dry-run
 				m[k] = "abc2"
 			} else {
@@ -208,19 +196,27 @@ func (r *Composable) findGetValueFrom2(path *field.Path, m []interface{}) field.
 }
 
 // validateGetValueFrom validates the syntax of input getValueFrom fields
-func validateGetValueFrom(k string, getValueFrom ComposableGetValueFrom) error {
+func validateGetValueFrom(v interface{}) error {
 	var missingItems []string
-	if getValueFrom.Name == "" {
+	getValueFrom := ComposableGetValueFrom{}
+
+	obj, err := json.Marshal(v)
+	if err != nil {
+		return fmt.Errorf("Invalid getValueFrom - %v", err.Error())
+	}
+	json.Unmarshal(obj, &getValueFrom)
+	if len(getValueFrom.Name) == 0 {
 		missingItems = append(missingItems, "name")
 	}
-	if getValueFrom.Kind == "" {
+	if len(getValueFrom.Kind) == 0 {
 		missingItems = append(missingItems, "kind")
 	}
-	if getValueFrom.Path == "" {
+	if len(getValueFrom.Path) == 0 {
 		missingItems = append(missingItems, "path")
 	}
 	if len(missingItems) > 0 {
 		items := array2string(missingItems)
+		composablelog.Info("getValueFrom is INVALID", "missing", items)
 		return fmt.Errorf("Missing required field(s) - %v", items)
 	}
 	return nil
@@ -237,35 +233,25 @@ func array2string(a []string) string {
 
 // dryrun as a means of syntax validation of the template content
 func (r *Composable) dryRun(m map[string]interface{}, op string) *field.Error {
-	composablelog.Info("dryRun", "name", r.Name)
-	newM, _ := json.Marshal(m)
-	composablelog.Info("embedded request", "new", string(newM))
-
 	cl, err := client.New(config.GetConfigOrDie(), client.Options{})
 	if err != nil {
 		return field.Invalid(field.NewPath("spec").Child("template"), r.Name, "dry-run failed to get client")
 	}
 
 	u := unstructured.Unstructured{Object: m}
-	u.SetAPIVersion(m["apiVersion"].(string))
-	u.SetKind(m["kind"].(string))
 	composablelog.Info("dry-run", "obj", u.Object)
-	composablelog.Info("dry-run", "apiversion", u.GetAPIVersion(), "kind", u.GetKind())
-
-	if op == "CREATE" {
-		composablelog.Info("create dry-run is called")
+	if op == OperationCreate {
 		if err = cl.Create(context.TODO(), &u, client.CreateDryRunAll); err != nil {
-			composablelog.Info("create dry-run failed", "err", err.Error())
+			composablelog.Info("create dry-run failed", "name", r.Name, "err", err.Error())
 			return field.Invalid(field.NewPath("spec").Child("template"), r.Name, err.Error())
 		}
 	}
-	if op == "UPDATE" {
-		composablelog.Info("update dry-run is called")
+	if op == OperationUpdate {
 		if err = cl.Update(context.TODO(), &u, client.UpdateDryRunAll); err != nil {
-			composablelog.Info("update dry-run failed", "err", err.Error())
+			composablelog.Info("update dry-run failed", "name", r.Name, "err", err.Error())
 			return field.Invalid(field.NewPath("spec").Child("template"), r.Name, err.Error())
 		}
 	}
-	composablelog.Info("dry-run passed")
+	composablelog.Info("dry-run passed", "name", r.Name)
 	return nil
 }
