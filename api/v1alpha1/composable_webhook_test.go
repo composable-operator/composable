@@ -104,7 +104,7 @@ func TestAdmissionControl(t *testing.T) {
 	g.Expect(createdGood.validateAPIVersionKind(createdGood.Spec.Template, field.NewPath("spec").Child("template"))).To(gomega.BeNil())
 
 	_, err := createdGood.validate(createdGood.Spec.Template, field.NewPath("spec").Child("template"))
-	g.Expect(hasError(err)).To(gomega.BeZero())
+	g.Expect(len(err)).To(gomega.BeZero())
 
 	// ToBeInvestigated (it fails to initiate the client)
 	//g.Expect(createdGood.dryRun(m, OperationCreate)).To(gomega.BeNil())
@@ -112,9 +112,5 @@ func TestAdmissionControl(t *testing.T) {
 	// Test validating webhook with an invalid template
 	g.Expect(createdBad.validateAPIVersionKind(createdBad.Spec.Template, field.NewPath("spec").Child("template"))).NotTo(gomega.BeNil())
 	_, err = createdBad.validate(createdBad.Spec.Template, field.NewPath("spec").Child("template"))
-	g.Expect(hasError(err)).NotTo(gomega.BeZero())
-}
-
-func hasError(errList field.ErrorList) int {
-	return len(errList)
+	g.Expect(len(err)).NotTo(gomega.BeZero())
 }
