@@ -51,7 +51,7 @@ type ComposableStatus struct {
 // +kubebuilder:printcolumn:name="Resource apiVersion",type=string,JSONPath=".spec.template.apiVersion"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
 
-// Composable represents a composable resource in solsa programming
+// Composable represents a composable resource that can wrap any resource (native kubernetes or CRDs) to allow it dynamically configurable
 type Composable struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`
@@ -71,12 +71,12 @@ type ComposableList struct {
 
 //ComposableGetValueFrom is the struct for Composable getValueFrom
 type ComposableGetValueFrom struct {
-	Kind               string `json:"kind"`
-	Group              string `json:"group"`
-	Name               string `json:"name"`
-	Namespace          string `json:"namespace,omitempty"`
-	Path               string `json:"path"`
-	FormatTransformers string `json:"format-transformers,omitempty"`
+	Kind               string   `json:"kind"`
+	APIVersion         string   `json:"apiVersion"`
+	Name               string   `json:"name"`
+	Namespace          string   `json:"namespace,omitempty"`
+	Path               string   `json:"path"`
+	FormatTransformers []string `json:"format-transformers,omitempty"`
 }
 
 func init() {
