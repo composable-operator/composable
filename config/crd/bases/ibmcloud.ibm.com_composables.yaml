@@ -32,7 +32,8 @@ spec:
   subresources: {}
   validation:
     openAPIV3Schema:
-      description: Composable represents a composable resource in solsa programming
+      description: Composable represents a composable resource that can wrap any resource
+        (native kubernetes or CRDs) to allow it dynamically configurable
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
