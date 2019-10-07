@@ -17,6 +17,19 @@
 
 set -e
 
+# check if cert-manager is installed
+echo "checking the prerequisite cert-manager ... "
+CERT=$(kubectl get crd | grep -c ^certificates.certmanager.k8s.io)
+CERTREQ=$(kubectl get crd | grep -c ^certificaterequests.certmanager.k8s.io)
+ISSUER=$(kubectl get crd | grep -c ^issuers.certmanager.k8s.io)
+if [[ "$CERT" -lt 1 || "$CERTREQ" -lt 1 || "$ISSUER" -lt 1 ]]
+then 
+  echo "missing prerequisites: cert-manager"
+  echo "please follow this link to install it: https://docs.cert-manager.io/en/latest/getting-started/install/kubernetes.html#"
+  exit
+else echo "good, found cert-manager in your cluster"
+fi
+
 RELEASE="latest/"
 
 # check if running piped from curl

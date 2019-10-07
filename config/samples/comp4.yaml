@@ -1,0 +1,35 @@
+apiVersion: ibmcloud.ibm.com/v1alpha1
+kind: Composable
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: comp
+spec:
+  template: 
+    apiVersion: ibmcloud.ibm.com/v1alpha1
+    kind: Service
+    metadata:
+      name:
+        getValueFrom:
+          kind: ConfigMap
+          name: myconfigmap
+          namespace: default
+          path: '{.data.name}'
+    spec:
+      instancename: 
+        getValueFrom:
+          kind: ConfigMap
+          name: myconfigmap
+          namespace: default
+          path: '{.data.name}'
+
+      serviceClass: Event Streams
+      plan: 
+        getValueFrom:
+          kind: Secret
+          name: mysecret
+          namespace: default
+          path: '{.data.plan}'
+          format-transformers:
+          - "Base64ToString"
+           

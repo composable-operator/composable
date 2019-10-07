@@ -15,16 +15,10 @@
 # limitations under the License.
 #
 
+set -e
 
-# Delete the CRDs first, so controllers clean up their resources
-# TODO - should label CRDs - see if it can be done with kubebuilder
-kubectl delete --wait crd composables.ibmcloud.ibm.com
-
-# Delete all clusterwide resources for the operator
-kubectl delete clusterrole,clusterrolebinding -l app.kubernetes.io/name=composable-operator  
-
-# Delete admission control webhook configs
-kubectl delete validatingwebhookconfiguration,mutatingwebhookconfiguration -l app.kubernetes.io/name=composable-operator  
-
-# delete all namespaced resources
-kubectl delete ns -l app.kubernetes.io/name=composable-operator
+# install cert-manager
+echo "installing cert-manager ... "
+kubectl create namespace cert-manager
+kubectl label namespace cert-manager certmanager.k8s.io/disable-validation=true
+kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v0.10.0/cert-manager.yaml

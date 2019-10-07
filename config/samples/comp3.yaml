@@ -1,0 +1,30 @@
+apiVersion: ibmcloud.ibm.com/v1alpha1
+kind: Composable
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: testcomp
+spec:
+  template: 
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: myconfigmap
+      namespace: default
+    data:
+      key:
+        getValueFrom:
+          kind: Secret
+          name: dallascluster
+          namespace: default
+          path: '{.data.tls\.key}'
+          format-transformers:
+          - "Base64ToString"      
+      dockerconfig:
+        getValueFrom:
+          kind: Secret
+          name: default-icr-io
+          namespace: default
+          path: '{.data.\.dockerconfigjson}'
+          format-transformers:
+          - "Base64ToString"
