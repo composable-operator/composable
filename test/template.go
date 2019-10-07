@@ -102,8 +102,8 @@ func DeleteObject(tContext TestContext, obj runtime.Object, async bool) {
 	}
 }
 
-// LoadService loads the YAML spec into obj
-func LoadCompasable(filename string) v1alpha1.Composable {
+// LoadComposable loads the YAML spec into Composable object
+func LoadComposable(filename string) v1alpha1.Composable {
 	return *LoadObject(filename, &v1alpha1.Composable{}).(*v1alpha1.Composable)
 }
 

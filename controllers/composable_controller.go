@@ -47,21 +47,20 @@ import (
 )
 
 const (
-	getValueFrom = "getValueFrom"
-	defaultValue = "defaultValue"
-	name         = "name"
-	path         = "path"
-	namespace    = "namespace"
-	metadata     = "metadata"
-	kind         = "kind"
-	apiVersion   = "apiVersion"
-	//	group          = "group"
+	getValueFrom   = "getValueFrom"
+	defaultValue   = "defaultValue"
+	name           = "name"
+	path           = "path"
+	namespace      = "namespace"
+	metadata       = "metadata"
+	kind           = "kind"
+	apiVersion     = "apiVersion"
 	spec           = "spec"
 	status         = "status"
 	state          = "state"
 	objectPrefix   = ".Object"
 	transformers   = "format-transformers"
-	controllerName = "Compasable-controller"
+	controllerName = "Composable-controller"
 
 	// FailedStatus composable status
 	FailedStatus = "Failed"

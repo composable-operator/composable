@@ -51,7 +51,7 @@ var _ = Describe("test Composable operations", func() {
 
 	AfterEach(func() {
 		// delete the Composable object
-		comp := test.LoadCompasable(dataDir + "compCopy.yaml")
+		comp := test.LoadComposable(dataDir + "compCopy.yaml")
 		test.DeleteInNs(testContext, &comp, false)
 		Eventually(test.GetObject(testContext, &comp)).Should(BeNil())
 
@@ -62,7 +62,7 @@ var _ = Describe("test Composable operations", func() {
 
 	It("Composable should successfully set default values to the output object", func() {
 		By("Deploy Composable object")
-		comp := test.LoadCompasable(dataDir + "compCopy.yaml")
+		comp := test.LoadComposable(dataDir + "compCopy.yaml")
 		test.PostInNs(testContext, &comp, false, 0)
 		Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 
@@ -118,7 +118,7 @@ var _ = Describe("test Composable operations", func() {
 		Eventually(test.GetUnstructuredObject(testContext, objNamespacedname, &unstrObj)).Should(Succeed())
 
 		By("Deploy Composable object")
-		comp := test.LoadCompasable(dataDir + "compCopy.yaml")
+		comp := test.LoadComposable(dataDir + "compCopy.yaml")
 		test.PostInNs(testContext, &comp, false, 0)
 		Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 		Eventually(test.GetState(testContext, &comp)).Should(Equal(OnlineStatus))
@@ -185,7 +185,7 @@ var _ = Describe("test Composable operations", func() {
 		}
 
 		By("deploy Composable object")
-		comp := test.LoadCompasable(dataDir + "compCopy.yaml")
+		comp := test.LoadComposable(dataDir + "compCopy.yaml")
 		test.PostInNs(testContext, &comp, false, 0)
 		Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 
@@ -277,7 +277,7 @@ var _ = Describe("Validate input objects Api grop and version discovery", func()
 		It("Composable should correctly discover required objects, core service without apiVersion", func() {
 
 			By("deploy Composable object " + "compServices.yaml")
-			comp := test.LoadCompasable(dataDir + "compServices.yaml")
+			comp := test.LoadComposable(dataDir + "compServices.yaml")
 			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 
@@ -308,7 +308,7 @@ var _ = Describe("Validate input objects Api grop and version discovery", func()
 			//Eventually(test.GetObject(testContext, tObj)).ShouldNot(BeNil())
 
 			By("deploy Composable object " + "compServicesV1.yaml")
-			comp := test.LoadCompasable(dataDir + "compServicesV1.yaml")
+			comp := test.LoadComposable(dataDir + "compServicesV1.yaml")
 			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 
@@ -329,7 +329,7 @@ var _ = Describe("Validate input objects Api grop and version discovery", func()
 		It("Composable should fail to discover correct Service recourse, when there are several groups with the same Kind", func() {
 
 			By("deploy Composable object " + "compAPIError.yaml")
-			comp := test.LoadCompasable(dataDir + "compAPIError.yaml")
+			comp := test.LoadComposable(dataDir + "compAPIError.yaml")
 			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 
@@ -343,7 +343,7 @@ var _ = Describe("Validate input objects Api grop and version discovery", func()
 		It("Composable should fail to discover correct Service recourse, when a wring API version is provided", func() {
 
 			By("deploy Composable object " + "compAPIWrongVersionError.yaml")
-			comp := test.LoadCompasable(dataDir + "compAPIWrongVersionError.yaml")
+			comp := test.LoadComposable(dataDir + "compAPIWrongVersionError.yaml")
 			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 
@@ -365,7 +365,7 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 	Context("create Service instance from ibmcloud.ibm.com WITHOUT external dependencies", func() {
 		It("should correctly create the Service instance", func() {
 
-			comp := test.LoadCompasable(dataDir + "comp.yaml")
+			comp := test.LoadComposable(dataDir + "comp.yaml")
 			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 
@@ -380,7 +380,7 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 
 		It("should delete the Composable and Service instances", func() {
 			By("Delete the Composable object")
-			comp := test.LoadCompasable(dataDir + "comp.yaml")
+			comp := test.LoadComposable(dataDir + "comp.yaml")
 			test.DeleteInNs(testContext, &comp, false)
 			Eventually(test.GetObject(testContext, &comp)).Should(BeNil())
 
@@ -416,7 +416,7 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 
 		It("should correctly create the Service instance according to parameters from a Secret object", func() {
 			By("deploy Composable comp1.yaml")
-			comp := test.LoadCompasable(dataDir + "comp1.yaml")
+			comp := test.LoadComposable(dataDir + "comp1.yaml")
 			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 
@@ -447,7 +447,7 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 			Eventually(test.GetObject(testContext, obj)).ShouldNot(BeNil())
 
 			By("deploy Composable comp2.yaml ")
-			comp := test.LoadCompasable(dataDir + "comp2.yaml")
+			comp := test.LoadComposable(dataDir + "comp2.yaml")
 			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 
