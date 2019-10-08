@@ -196,14 +196,19 @@ spec:
 
 The `getValueFrom` element should be a single child of the parent element and can contain the following sub-fileds:
 
-Filed | Is required | Format/Type | Comments
+Field | Is required | Format/Type | Comments
 ----- | ------------|-------------|-----------------
  kind | Yes | String | Kind of the input object
  apiVersion | No | String | Defines a K8s Api group and version of the checking object. Helps to resolve conflicts, when the same `Kind` defined in several API groups and there are several supported API versions
- name | Yes | String | Name of the input object
+ name | Yes/No | String | Name of the input object. Either name or labels should be defined
+ labels | Yes/No | [string]string | Labels of input objects. Either name or labels should be defined
  namespace | No | String | Namespace of the input object, if isn't defined, the ns of the `Composable` operator will be checked
  path | Yes | String | The `jsonpath` formatted path to the checked filed
  format-transformers | No | Array of predefined strings | Used for value type transformation, see [Format transformers](#format-transformers)
+
+Notes:
+* Ether `name` or `labels` of the input object should be defined. If neither of both the fields are defined, an error will be generated.
+* The labels based search should return a single input object. 
 
 ## The input object group and version discovery algorithm
 

@@ -50,6 +50,7 @@ const (
 	getValueFrom   = "getValueFrom"
 	defaultValue   = "defaultValue"
 	name           = "name"
+	labels         = "labels"
 	path           = "path"
 	namespace      = "namespace"
 	metadata       = "metadata"
@@ -446,7 +447,6 @@ func NameMatchesResource(kind string, resource metav1.APIResource, resGroup stri
 			return true
 		}
 	}
-
 	return false
 }
 
@@ -532,115 +532,26 @@ func (r *composableReconciler) resolveValue(value interface{}, composableNamespa
 			if apiversion, ok = val[apiVersion].(string); !ok {
 				apiversion = ""
 			}
-			res, compErr := r.lookupAPIResource(objKind, apiversion)
-			if compErr != nil {
-				// We cannot resolve input object API resource, so we return error even if a default value is set.
-				return nil, compErr
-			}
-			if name, ok := val[name].(string); ok {
-				if path, ok := val[path].(string); ok {
-					if strings.HasPrefix(path, "{.") {
-						var objNamespacedname types.NamespacedName
-						if res.Namespaced {
-							namespace, ok := val[namespace].(string)
-							if !ok {
-								namespace = composableNamespace
-							}
-							objNamespacedname = types.NamespacedName{Namespace: namespace, Name: name}
-						} else {
-							objNamespacedname = types.NamespacedName{Name: name}
-						}
-						groupVersionKind := schema.GroupVersionKind{Kind: res.Kind, Version: res.Version, Group: res.Group}
-						var unstrObj unstructured.Unstructured
-						key := objectKey(objNamespacedname, groupVersionKind)
-						if obj, ok := cache.objects[key]; ok {
-							switch obj.(type) {
-							case unstructured.Unstructured:
-								unstrObj = obj.(unstructured.Unstructured)
-							case toumbstone:
-								ts := obj.(toumbstone)
-								if errors.IsNotFound(ts.err.error) {
-									// we have checked the object and did not fined it
-									val, err1 := r.errorToDefaultValue(val, ts.err)
-									return val, err1
-								}
-								// we should not be here
-								return nil, &ts.err
-							default:
-								err = fmt.Errorf("wrong type of cached object %T", obj)
-								r.log.Error(err, "")
-								return nil, &composableError{err, false, false}
-							}
+			if path, ok := val[path].(string); ok {
+				if strings.HasPrefix(path, "{.") {
 
-						} else {
-							unstrObj = unstructured.Unstructured{}
-							//unstrObj.SetAPIVersion(res.Version)
-							unstrObj.SetGroupVersionKind(groupVersionKind)
-							r.log.V(1).Info("Get input object", "obj", objNamespacedname, "groupVersionKind", groupVersionKind)
-							err = r.Get(context.TODO(), objNamespacedname, &unstrObj)
-							if err != nil {
-								r.log.Info("Get object returned ", "err", err, "obj", objNamespacedname)
-								compErr = &composableError{err, true, true}
-								cache.objects[key] = toumbstone{err: *compErr}
-								if errors.IsNotFound(err) {
-									return r.errorToDefaultValue(val, *compErr)
-								}
-								return nil, compErr
-							}
-							cache.objects[key] = unstrObj
+					unstrObj, compErr := r.getInputObject(val, objKind, apiversion, composableNamespace, cache)
+					if compErr != nil {
+						if errors.IsNotFound(compErr.error) {
+							// we have checked the object and did not fined it
+							val, err1 := r.errorToDefaultValue(val, *compErr)
+							return val, err1
 						}
-						j := jsonpath.New("compose")
-						// add ".Object" to the path
-						path = path[:1] + objectPrefix + path[1:]
-						err = j.Parse(path)
-						if err != nil {
-							r.log.Error(err, "jsonpath.Parse", "path", path)
-							return nil, &composableError{err, false, false}
-						}
-						j.AllowMissingKeys(false)
-
-						fullResults, err := j.FindResults(unstrObj)
-						if err != nil {
-							r.log.Error(err, "FindResults", "obj", unstrObj, "path", path)
-							if strings.Contains(err.Error(), "is not found") {
-								val1, err1 := r.errorToDefaultValue(val, composableError{err, true, true})
-								r.log.Info("resolveValue 3", "val", val1, "err", err1)
-								return val, err1
-							}
-							return nil, &composableError{err, false, false}
-						}
-						// TODO check default
-
-						iface, ok := template.PrintableValue(fullResults[0][0])
-						if !ok {
-							err = fmt.Errorf("can't find printable value %v ", fullResults[0][0])
-							r.log.Error(err, "template.PrintableValue", "obj", unstrObj, "path", path)
-							return nil, &composableError{err, false, false}
-						}
-
-						var retVal interface{}
-						if transformers, ok := val[transformers].([]interface{}); ok && len(transformers) > 0 {
-							transformNames := make([]string, 0, len(transformers))
-							for _, v := range transformers {
-								if name, ok := v.(string); ok {
-									transformNames = append(transformNames, name)
-								}
-							}
-							retVal, err = CompoundTransformerNames(iface, transformNames...)
-						} else {
-							retVal = iface
-						}
-						return retVal, nil
+						// we should not be here
+						return nil, compErr
 					}
-					err = fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is not jsonpath formated ")
-					r.log.Error(err, "resolveValue", "path", path)
-					return nil, &composableError{err, false, false}
+					return r.resolveValue2(val, *unstrObj, path)
 				}
-				err = fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is not defined ")
-				r.log.Error(err, "resolveValue", "val", val)
+				err = fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is not jsonpath formated ")
+				r.log.Error(err, "resolveValue", "path", path)
 				return nil, &composableError{err, false, false}
 			}
-			err = fmt.Errorf("Failed: getValueFrom is not well-formed, 'name' is not defined ")
+			err = fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is not defined ")
 			r.log.Error(err, "resolveValue", "val", val)
 			return nil, &composableError{err, false, false}
 		}
@@ -651,6 +562,135 @@ func (r *composableReconciler) resolveValue(value interface{}, composableNamespa
 	err = fmt.Errorf("Failed: getValueFrom is not well-formed, value type is not %T ", value)
 	r.log.Error(err, "resolveValue", "value", value)
 	return nil, &composableError{err, false, false}
+}
+
+func (r *composableReconciler) getInputObject(val map[string]interface{}, objKind, apiversion, composableNamespace string, cache *composableCache) (*unstructured.Unstructured, *composableError) {
+	res, compErr := r.lookupAPIResource(objKind, apiversion)
+	if compErr != nil {
+		// We cannot resolve input object API resource, so we return error even if a default value is set.
+		return nil, compErr
+	}
+	groupVersionKind := schema.GroupVersionKind{Kind: res.Kind, Version: res.Version, Group: res.Group}
+	var ns string
+	var ok bool
+	if res.Namespaced {
+		ns, ok = val[namespace].(string)
+		if !ok {
+			ns = composableNamespace
+		}
+	}
+	var err error
+	name, nameOK := val[name].(string)
+	intLabels, labelsOK := val[labels].(map[string]interface{})
+	if nameOK == labelsOK { // only one of them should be defined
+		if nameOK && labelsOK {
+			err = fmt.Errorf("Failed: getValueFrom is not well-formed, both 'name' and 'labels' cannot be defined ")
+		} else {
+			err = fmt.Errorf("Failed: getValueFrom is not well-formed, neither 'name' nor 'labels' are not defined  ")
+			r.log.Error(err, "getInputObject", "val", val)
+			return nil, &composableError{err, false, false}
+		}
+	}
+	key := objectKey(name, ns, intLabels, groupVersionKind)
+	if obj, ok := cache.objects[key]; ok {
+		switch obj.(type) {
+		case unstructured.Unstructured:
+			unstrObj := obj.(unstructured.Unstructured)
+			return &unstrObj, nil
+		case toumbstone:
+			ts := obj.(toumbstone)
+			return nil, &ts.err
+		default:
+			err = fmt.Errorf("wrong type of cached object %T", obj)
+			r.log.Error(err, "")
+			return nil, &composableError{err, false, false}
+		}
+	}
+	var unstrObj unstructured.Unstructured
+	if nameOK {
+		unstrObj.SetGroupVersionKind(groupVersionKind)
+		var objNamespacedname types.NamespacedName
+		if res.Namespaced {
+			objNamespacedname = types.NamespacedName{Namespace: ns, Name: name}
+		} else {
+			objNamespacedname = types.NamespacedName{Name: name}
+		}
+		r.log.V(1).Info("Get input object", "obj", objNamespacedname, "groupVersionKind", groupVersionKind)
+		err := r.Get(context.TODO(), objNamespacedname, &unstrObj)
+		if err != nil {
+			r.log.Info("Get object returned ", "err", err, "obj", objNamespacedname)
+			compErr = &composableError{err, true, true}
+			cache.objects[key] = toumbstone{err: *compErr}
+			return nil, compErr
+		}
+	} else { //labelsOK
+		strLabels := make(map[string]string)
+		for key, value := range intLabels {
+			strValue := fmt.Sprintf("%v", value)
+			strLabels[key] = strValue
+		}
+		unstrList := unstructured.UnstructuredList{}
+		unstrList.SetGroupVersionKind(groupVersionKind)
+		err = r.List(context.TODO(), &unstrList, client.InNamespace(namespace), client.MatchingLabels(strLabels))
+		if err != nil {
+			r.log.Info("list object returned ", "err", err, "namespace", namespace, "labels", strLabels, "groupVersionKind", groupVersionKind)
+			compErr = &composableError{err, true, true}
+			cache.objects[key] = toumbstone{err: *compErr}
+			return nil, compErr
+		}
+		itms := len(unstrList.Items)
+		if itms == 1 {
+			unstrObj = unstrList.Items[0]
+			cache.objects[key] = unstrObj
+		} else {
+			r.log.Info("list object returned wrong # of items", "items", itms, "namespace", namespace, "labels", strLabels, "groupVersionKind", groupVersionKind)
+			compErr = &composableError{err, true, true}
+			cache.objects[key] = toumbstone{err: *compErr}
+			return nil, compErr
+		}
+	}
+	return &unstrObj, nil
+}
+
+func (r *composableReconciler) resolveValue2(val map[string]interface{}, unstrObj unstructured.Unstructured, path string) (interface{}, *composableError) {
+	j := jsonpath.New("compose")
+	// add ".Object" to the path
+	path = path[:1] + objectPrefix + path[1:]
+	err := j.Parse(path)
+	if err != nil {
+		r.log.Error(err, "jsonpath.Parse", "path", path)
+		return nil, &composableError{err, false, false}
+	}
+	j.AllowMissingKeys(false)
+
+	fullResults, err := j.FindResults(unstrObj)
+	if err != nil {
+		r.log.Error(err, "FindResults", "obj", unstrObj, "path", path)
+		if strings.Contains(err.Error(), "is not found") {
+			return r.errorToDefaultValue(val, composableError{err, true, true})
+		}
+		return nil, &composableError{err, false, false}
+	}
+	iface, ok := template.PrintableValue(fullResults[0][0])
+	if !ok {
+		err = fmt.Errorf("can't find printable value %v ", fullResults[0][0])
+		r.log.Error(err, "template.PrintableValue", "obj", unstrObj, "path", path)
+		return nil, &composableError{err, false, false}
+	}
+
+	var retVal interface{}
+	if transformers, ok := val[transformers].([]interface{}); ok && len(transformers) > 0 {
+		transformNames := make([]string, 0, len(transformers))
+		for _, v := range transformers {
+			if name, ok := v.(string); ok {
+				transformNames = append(transformNames, name)
+			}
+		}
+		retVal, err = CompoundTransformerNames(iface, transformNames...)
+	} else {
+		retVal = iface
+	}
+	return retVal, nil
 }
 
 func (r *composableReconciler) errorToDefaultValue(val map[string]interface{}, err composableError) (interface{}, *composableError) {
@@ -686,6 +726,6 @@ func getState(obj map[string]interface{}) (string, error) {
 	return "", fmt.Errorf("Failed: Composable doesn't contain state")
 }
 
-func objectKey(nn types.NamespacedName, gvk schema.GroupVersionKind) string {
-	return fmt.Sprintf("%s/%s", nn.String(), gvk.String())
+func objectKey(name string, namespace string, labels map[string]interface{}, gvk schema.GroupVersionKind) string {
+	return fmt.Sprintf("%s/%s/%v/%s", name, namespace, labels, gvk.String())
 }
