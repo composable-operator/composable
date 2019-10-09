@@ -32,7 +32,6 @@ spec:
         - --enable-leader-election
         command:
         - /manager
-        #image: lauratest/composable:0.1.2
         image: cloudoperators/composable-controller:0.1.2
         imagePullPolicy: Always
         name: manager
