@@ -1,0 +1,28 @@
+apiVersion: ibmcloud.ibm.com/v1alpha1
+kind: Composable
+metadata:
+  name: labels-test
+spec:
+  template:
+    apiVersion: "test.ibmcloud.ibm.com/v1"
+    kind: OutputValue
+    metadata:
+      name: labels-test
+    spec:
+      instancename: labels-test
+      testValue:
+        getValueFrom:
+          kind: Service
+          name: test-service
+          labels:
+            l1: aa
+            l2: bb
+          apiVersion: test.ibmcloud.ibm.com/v1
+          namespace: default
+          path: '{.spec.sessionAffinity}'
+
+
+
+
+
+

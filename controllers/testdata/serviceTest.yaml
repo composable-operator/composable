@@ -3,5 +3,8 @@ kind: Service
 metadata:
   name: test-service
   namespace: default
+  labels:
+    l1: "aa"
+    l2: "bb"
 spec:
   sessionAffinity: "Test"

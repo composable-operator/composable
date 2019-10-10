@@ -60,12 +60,23 @@ func GetUnstructuredObject(tContext TestContext, namespacedname types.Namespaced
 	}
 }
 
-// GetState gets the object status from the store
-func GetState(tContext TestContext, comp *v1alpha1.Composable) func() string {
+// GetStatusState returns the status state of a Composable object
+func GetStatusState(tContext TestContext, comp *v1alpha1.Composable) func() string {
 	return func() string {
 		if obj := GetObject(tContext, comp)(); comp != nil {
 			c := obj.(*v1alpha1.Composable)
 			return c.Status.State
+		}
+		return ""
+	}
+}
+
+// GetStatusMessage returns the status message of a Composable object
+func GetStatusMessage(tContext TestContext, comp *v1alpha1.Composable) func() string {
+	return func() string {
+		if obj := GetObject(tContext, comp)(); comp != nil {
+			c := obj.(*v1alpha1.Composable)
+			return c.Status.Message
 		}
 		return ""
 	}

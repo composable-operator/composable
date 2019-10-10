@@ -587,9 +587,9 @@ func (r *composableReconciler) getInputObject(val map[string]interface{}, objKin
 			err = fmt.Errorf("Failed: getValueFrom is not well-formed, both 'name' and 'labels' cannot be defined ")
 		} else {
 			err = fmt.Errorf("Failed: getValueFrom is not well-formed, neither 'name' nor 'labels' are not defined  ")
-			r.log.Error(err, "getInputObject", "val", val)
-			return nil, &composableError{err, false, false}
 		}
+		r.log.Error(err, "getInputObject", "val", val)
+		return nil, &composableError{err, false, false}
 	}
 	key := objectKey(name, ns, intLabels, groupVersionKind)
 	if obj, ok := cache.objects[key]; ok {
@@ -631,9 +631,9 @@ func (r *composableReconciler) getInputObject(val map[string]interface{}, objKin
 		}
 		unstrList := unstructured.UnstructuredList{}
 		unstrList.SetGroupVersionKind(groupVersionKind)
-		err = r.List(context.TODO(), &unstrList, client.InNamespace(namespace), client.MatchingLabels(strLabels))
+		err = r.List(context.TODO(), &unstrList, client.InNamespace(ns), client.MatchingLabels(strLabels))
 		if err != nil {
-			r.log.Info("list object returned ", "err", err, "namespace", namespace, "labels", strLabels, "groupVersionKind", groupVersionKind)
+			r.log.Info("list object returned ", "err", err, "namespace", ns, "labels", strLabels, "groupVersionKind", groupVersionKind)
 			compErr = &composableError{err, true, true}
 			cache.objects[key] = toumbstone{err: *compErr}
 			return nil, compErr
@@ -643,7 +643,8 @@ func (r *composableReconciler) getInputObject(val map[string]interface{}, objKin
 			unstrObj = unstrList.Items[0]
 			cache.objects[key] = unstrObj
 		} else {
-			r.log.Info("list object returned wrong # of items", "items", itms, "namespace", namespace, "labels", strLabels, "groupVersionKind", groupVersionKind)
+			err = fmt.Errorf("list object returned %d items ", itms)
+			r.log.Error(err, "wrong # of items", "items", itms, "namespace", namespace, "labels", strLabels, "groupVersionKind", groupVersionKind)
 			compErr = &composableError{err, true, true}
 			cache.objects[key] = toumbstone{err: *compErr}
 			return nil, compErr
