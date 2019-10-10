@@ -17,7 +17,6 @@
 package controllers
 
 import (
-	//	"github.com/ibm/composable/api"
 	"github.com/ibm/composable/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -25,12 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-
-	//	"k8s.io/client-go/kubernetes/scheme"
-	//	"k8s.io/client-go/rest"
 	"k8s.io/klog"
-	//	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	//	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 var (
@@ -121,7 +115,7 @@ var _ = Describe("test Composable operations", func() {
 		comp := test.LoadComposable(dataDir + "compCopy.yaml")
 		test.PostInNs(testContext, &comp, false, 0)
 		Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
-		Eventually(test.GetState(testContext, &comp)).Should(Equal(OnlineStatus))
+		Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(OnlineStatus))
 
 		By("Get Output object")
 		groupVersionKind = schema.GroupVersionKind{Kind: "OutputValue", Version: "v1", Group: "test.ibmcloud.ibm.com"}
@@ -337,7 +331,7 @@ var _ = Describe("Validate input objects Api grop and version discovery", func()
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 
 			By("validate that Composable object status is FailedStatus")
-			Eventually(test.GetState(testContext, &comp)).Should(Equal(FailedStatus))
+			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(FailedStatus))
 
 		})
 		It("Composable should fail to discover correct Service recourse, when a wring API version is provided", func() {
@@ -351,10 +345,119 @@ var _ = Describe("Validate input objects Api grop and version discovery", func()
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 
 			By("validate that Composable object status is FailedStatus")
-			Eventually(test.GetState(testContext, &comp)).Should(Equal(FailedStatus))
+			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(FailedStatus))
 
 		})
 
+	})
+})
+
+var _ = Describe("Find input objects according their labels", func() {
+	Context("...", func() {
+		dataDir := "testdata/"
+
+		fGetValueFrom := func(unstrObj unstructured.Unstructured) map[string]interface{} {
+			sp := unstrObj.Object[spec].(map[string]interface{})
+			v := sp["testValue"].(map[string]interface{})
+			return v[getValueFrom].(map[string]interface{})
+		}
+		BeforeEach(func() {
+			By("deploy test Service")
+			tObj := test.LoadObject(dataDir+"serviceTest.yaml", &unstructured.Unstructured{})
+			test.CreateObject(testContext, tObj, false, 0)
+			Eventually(test.GetObject(testContext, tObj)).ShouldNot(BeNil())
+		})
+
+		AfterEach(func() {
+			By("delete test Service")
+			tObj := test.LoadObject(dataDir+"serviceTest.yaml", &unstructured.Unstructured{})
+			test.DeleteObject(testContext, tObj, false)
+			Eventually(test.GetObject(testContext, tObj)).Should(BeNil())
+		})
+		It("Deployment should fail with the `neither 'name' nor 'labels' are not defined` error", func() {
+			By("deploy Composable object " + "compLabels.yaml" + " without name and labels")
+			comp := test.LoadComposable(dataDir + "compLabels.yaml")
+			unstrObj := unstructured.Unstructured{}
+			unstrObj.UnmarshalJSON(comp.Spec.Template.Raw)
+			valueFrom := fGetValueFrom(unstrObj)
+			delete(valueFrom, name)
+			delete(valueFrom, labels)
+			comp.Spec.Template.Raw, _ = unstrObj.MarshalJSON()
+			test.PostInNs(testContext, &comp, false, 0)
+			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
+			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(FailedStatus))
+			Ω(test.GetStatusMessage(testContext, &comp)()).Should(ContainSubstring("name' nor 'labels' are not defined"))
+			test.DeleteInNs(testContext, &comp, false)
+			Eventually(test.GetObject(testContext, &comp)).Should(BeNil())
+		})
+
+		It("Deployment should fail with the `both 'name' and 'labels' cannot be defined` error", func() {
+			By("deploy Composable object " + "compLabels.yaml" + " with both name and labels")
+			comp := test.LoadComposable(dataDir + "compLabels.yaml")
+			test.PostInNs(testContext, &comp, false, 0)
+			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
+			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(FailedStatus))
+			Ω(test.GetStatusMessage(testContext, &comp)()).Should(ContainSubstring("both 'name' and 'labels' cannot be defined"))
+			test.DeleteInNs(testContext, &comp, false)
+			Eventually(test.GetObject(testContext, &comp)).Should(BeNil())
+		})
+
+		It("Deployment should fail when the label-based search returns more than one object", func() {
+			By("Deploy another service object")
+			tObj := test.LoadObject(dataDir+"serviceTest.yaml", &unstructured.Unstructured{})
+			unstrObjp := tObj.(*unstructured.Unstructured)
+			unstrObjp.SetName(unstrObjp.GetName() + "2")
+			test.CreateObject(testContext, tObj, false, 0)
+			Eventually(test.GetObject(testContext, tObj)).ShouldNot(BeNil())
+
+			By("deploy Composable object " + "compLabels.yaml" + " with both name and labels")
+			comp := test.LoadComposable(dataDir + "compLabels.yaml")
+			unstrObj := unstructured.Unstructured{}
+			unstrObj.UnmarshalJSON(comp.Spec.Template.Raw)
+			valueFrom := fGetValueFrom(unstrObj)
+			delete(valueFrom, name)
+			comp.Spec.Template.Raw, _ = unstrObj.MarshalJSON()
+			test.PostInNs(testContext, &comp, false, 0)
+			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
+			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(PendingStatus))
+			Ω(test.GetStatusMessage(testContext, &comp)()).Should(ContainSubstring("list object returned 2 items"))
+			test.DeleteInNs(testContext, &comp, false)
+			Eventually(test.GetObject(testContext, &comp)).Should(BeNil())
+			test.DeleteObject(testContext, tObj, false)
+			Eventually(test.GetObject(testContext, tObj)).Should(BeNil())
+		})
+
+		It("Successful deployment with correctly defined labels ", func() {
+			By("deploy Composable object " + "compLabels.yaml" + " with labels")
+			comp := test.LoadComposable(dataDir + "compLabels.yaml")
+			unstrObj := unstructured.Unstructured{}
+			unstrObj.UnmarshalJSON(comp.Spec.Template.Raw)
+			valueFrom := fGetValueFrom(unstrObj)
+			delete(valueFrom, name)
+			comp.Spec.Template.Raw, _ = unstrObj.MarshalJSON()
+			test.PostInNs(testContext, &comp, false, 0)
+			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
+			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(OnlineStatus))
+			test.DeleteInNs(testContext, &comp, false)
+			Eventually(test.GetObject(testContext, &comp)).Should(BeNil())
+		})
+
+		It("Successful deployment with correctly defined labels sub-set ", func() {
+			By("deploy Composable object " + "compLabels.yaml" + " with labels")
+			comp := test.LoadComposable(dataDir + "compLabels.yaml")
+			unstrObj := unstructured.Unstructured{}
+			unstrObj.UnmarshalJSON(comp.Spec.Template.Raw)
+			valueFrom := fGetValueFrom(unstrObj)
+			delete(valueFrom, name)
+			lb := valueFrom[labels].(map[string]interface{})
+			delete(lb, "l1")
+			comp.Spec.Template.Raw, _ = unstrObj.MarshalJSON()
+			test.PostInNs(testContext, &comp, false, 0)
+			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
+			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(OnlineStatus))
+			test.DeleteInNs(testContext, &comp, false)
+			Eventually(test.GetObject(testContext, &comp)).Should(BeNil())
+		})
 	})
 })
 
@@ -374,7 +477,7 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 			unstrObj.SetGroupVersionKind(groupVersionKind)
 			klog.V(5).Infof("Get Object %s\n", objNamespacedname)
 			Eventually(test.GetUnstructuredObject(testContext, objNamespacedname, &unstrObj)).Should(Succeed())
-			Eventually(test.GetState(testContext, &comp)).Should(Equal(OnlineStatus))
+			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(OnlineStatus))
 
 		})
 
@@ -433,7 +536,7 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 
 			By("validate that Composable object status is Online")
-			Eventually(test.GetState(testContext, &comp)).Should(Equal(OnlineStatus))
+			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(OnlineStatus))
 
 			By("delete the composable object")
 			test.DeleteInNs(testContext, &comp, false)
@@ -464,7 +567,7 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 
 			By("validate that Composable object status is Online")
-			Eventually(test.GetState(testContext, &comp)).Should(Equal(OnlineStatus))
+			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(OnlineStatus))
 
 			By("delete the composable object")
 			test.DeleteInNs(testContext, &comp, false)
