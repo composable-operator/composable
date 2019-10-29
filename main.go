@@ -20,10 +20,9 @@ import (
 	"os"
 
 	"github.com/go-logr/zapr"
-	"go.uber.org/zap"
-
 	ibmcloudv1alpha1 "github.com/ibm/composable/api/v1alpha1"
 	"github.com/ibm/composable/controllers"
+	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -47,9 +46,13 @@ func init() {
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
+	var admissionControl bool
+
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
+	flag.BoolVar(&admissionControl, "enable-admission-control", true,
+		"Enable admission control.")
 	flag.Parse()
 
 	ctrl.SetLogger(zapr.NewLogger(contrZap.RawLoggerTo(os.Stderr, true, zap.AddCaller())))
@@ -68,9 +71,12 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Composable")
 		os.Exit(1)
 	}
-	if err = (&ibmcloudv1alpha1.Composable{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "Composable")
-		os.Exit(1)
+
+	if admissionControl {
+		if err = (&ibmcloudv1alpha1.Composable{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Composable")
+			os.Exit(1)
+		}
 	}
 	// +kubebuilder:scaffold:builder
 
