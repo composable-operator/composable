@@ -29,8 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/discovery"
-	memory "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -63,11 +61,10 @@ const (
 // ComposableReconciler reconciles a Composable object
 type composableReconciler struct {
 	client.Client
-	log             logr.Logger
-	discoveryClient discovery.CachedDiscoveryInterface
-	config          *rest.Config
-	scheme          *runtime.Scheme
-	controller      controller.Controller
+	log        logr.Logger
+	config     *rest.Config
+	scheme     *runtime.Scheme
+	controller controller.Controller
 }
 
 // ManagerSettableReconciler - a Reconciler that can be added to a Manager
@@ -81,13 +78,11 @@ var _ ManagerSettableReconciler = &composableReconciler{}
 // NewReconciler ...
 func NewReconciler(mgr ctrl.Manager) ManagerSettableReconciler {
 	cfg := mgr.GetConfig()
-	discClient := discovery.NewDiscoveryClientForConfigOrDie(cfg)
 	return &composableReconciler{
-		Client:          mgr.GetClient(),
-		log:             ctrl.Log.WithName("controllers").WithName("Composable"),
-		discoveryClient: memory.NewMemCacheClient(discClient),
-		scheme:          mgr.GetScheme(),
-		config:          cfg,
+		Client: mgr.GetClient(),
+		log:    ctrl.Log.WithName("controllers").WithName("Composable"),
+		scheme: mgr.GetScheme(),
+		config: cfg,
 	}
 }
 
@@ -107,9 +102,6 @@ func (r *composableReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 
 	r.log.Info("Starting reconcile loop", "request", req)
 	defer r.log.Info("Finish reconcile loop", "request", req)
-
-	// TODO should we use a separate go routine to invalidate it ?
-	r.discoveryClient.Invalidate()
 
 	// Fetch the Composable instance
 	compInstance := &ibmcloudv1alpha1.Composable{}

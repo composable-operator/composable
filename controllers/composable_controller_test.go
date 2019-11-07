@@ -153,7 +153,7 @@ var _ = Describe("test Composable operations", func() {
 		Ω(testSpec["objectValue"]).Should(Equal(map[string]interface{}{"family": "FamilyName", "first": "FirstName", "age": int64(27)}))
 
 		By("copy stringJson2Value")
-		val, _ := sdk.Array2CSStringTransformer(strArray.(interface{}))
+		val, _ := sdk.Array2CSStringTransformer(strArray)
 		Ω(testSpec["stringJson2Value"]).Should(BeEquivalentTo(val))
 
 	})

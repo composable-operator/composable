@@ -15,3 +15,13 @@ type ComposableError struct {
 	// if the error is retrievable the controller will return it to the manager, and teh last will recall Reconcile again
 	IsRetrievable bool
 }
+
+//ComposableGetValueFrom is the struct for Composable getValueFrom
+type ComposableGetValueFrom struct {
+	Kind               string   `json:"kind"`
+	APIVersion         string   `json:"apiVersion"`
+	Name               string   `json:"name"`
+	Namespace          string   `json:"namespace,omitempty"`
+	Path               string   `json:"path"`
+	FormatTransformers []string `json:"format-transformers,omitempty"`
+}
