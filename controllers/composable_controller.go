@@ -20,21 +20,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
+	ibmcloudv1alpha1 "github.com/ibm/composable/api/v1alpha1"
+	sdk "github.com/ibm/composable/sdk/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
 	memory "k8s.io/client-go/discovery/cached"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/third_party/forked/golang/template"
-	"k8s.io/client-go/util/jsonpath"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -42,25 +39,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-
-	ibmcloudv1alpha1 "github.com/ibm/composable/api/v1alpha1"
 )
 
 const (
-	getValueFrom   = "getValueFrom"
-	defaultValue   = "defaultValue"
-	name           = "name"
-	labels         = "labels"
 	path           = "path"
-	namespace      = "namespace"
-	metadata       = "metadata"
 	kind           = "kind"
 	apiVersion     = "apiVersion"
 	spec           = "spec"
 	status         = "status"
 	state          = "state"
-	objectPrefix   = ".Object"
-	transformers   = "format-transformers"
 	controllerName = "Composable-controller"
 
 	// FailedStatus composable status
@@ -90,22 +77,6 @@ type ManagerSettableReconciler interface {
 }
 
 var _ ManagerSettableReconciler = &composableReconciler{}
-
-type composableCache struct {
-	objects map[string]interface{}
-}
-
-type toumbstone struct {
-	err composableError
-}
-
-type composableError struct {
-	error
-	// TODO do we need this state separation
-	isPendable bool
-	// if the error is retrievable the controller will return it to the manager, and teh last will recall Reconcile again
-	isRetrievable bool
-}
 
 // NewReconciler ...
 func NewReconciler(mgr ctrl.Manager) ManagerSettableReconciler {
@@ -193,17 +164,17 @@ func (r *composableReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 		return ctrl.Result{}, nil
 	}
 
-	resource, compError := r.resolve(object, compInstance.Namespace)
+	resource, compError := sdk.Resolve(r.Client, r.config, object, compInstance.Namespace)
 
 	if compError != nil {
-		status.Message = compError.Error()
-		if compError.isPendable {
+		status.Message = compError.Error.Error()
+		if compError.IsPendable {
 			status.State = PendingStatus
 			return ctrl.Result{}, nil
 		}
 		status.State = FailedStatus
-		if compError.isRetrievable {
-			return ctrl.Result{}, compError.error
+		if compError.IsRetrievable {
+			return ctrl.Result{}, compError.Error
 		}
 		return ctrl.Result{}, nil
 
@@ -337,381 +308,17 @@ func (r *composableReconciler) toJSONFromRaw(content *runtime.RawExtension) (int
 	return data, nil
 }
 
-func (r *composableReconciler) resolve(object interface{}, composableNamespace string) (unstructured.Unstructured, *composableError) {
-	objMap := object.(map[string]interface{})
-	if _, ok := objMap[metadata]; !ok {
-		err := fmt.Errorf("Failed: Template has no metadata section")
-		r.log.Error(err, "", "object", objMap)
-		return unstructured.Unstructured{}, &composableError{err, false, false}
-	}
-	// the underlying object should be created in the same namespace as the Composable object
-	if metadata, ok := objMap[metadata].(map[string]interface{}); ok {
-		if ns, ok := metadata[namespace]; ok {
-			if composableNamespace != ns {
-				err := fmt.Errorf("Failed: Template defines a wrong namespace %v", ns)
-				r.log.Error(err, "", "object", objMap)
-				return unstructured.Unstructured{}, &composableError{err, false, false}
-			}
-
-		} else {
-			metadata[namespace] = composableNamespace
-		}
-	} else {
-		err := fmt.Errorf("Failed: Template has an ill-defined metadata section")
-		r.log.Error(err, "", "object", objMap)
-		return unstructured.Unstructured{}, &composableError{err, false, false}
-	}
-
-	cache := &composableCache{objects: make(map[string]interface{})}
-	obj, err := r.resolveFields(object.(map[string]interface{}), composableNamespace, cache)
-	if err != nil {
-		return unstructured.Unstructured{}, err
-	}
-	ret := unstructured.Unstructured{Object: obj.(map[string]interface{})}
-	return ret, nil
-}
-
-func (r *composableReconciler) resolveFields(fields interface{}, composableNamespace string, cache *composableCache) (interface{}, *composableError) {
-	switch fields.(type) {
-	case map[string]interface{}:
-		if fieldsOut, ok := fields.(map[string]interface{}); ok {
-			for k, v := range fieldsOut {
-				var newFields interface{}
-				var err *composableError
-				if k == getValueFrom {
-					newFields, err = r.resolveValue(v, composableNamespace, cache)
-					if err != nil {
-						r.log.Info("resolveFields resolveValue 1", "err", err)
-						return nil, err
-					}
-					fields = newFields
-				} else if values, ok := v.(map[string]interface{}); ok {
-					if value, ok := values[getValueFrom]; ok {
-						if len(values) > 1 {
-							err := fmt.Errorf("Failed: Template is ill-formed. GetValueFrom must be the only field in a value")
-							r.log.Error(err, "resolveFields", "values", values)
-							return nil, &composableError{err, false, false}
-						}
-						newFields, err = r.resolveValue(value, composableNamespace, cache)
-					} else {
-						newFields, err = r.resolveFields(values, composableNamespace, cache)
-					}
-					if err != nil {
-						r.log.Info("resolveFields resolveValue 2", "err", err)
-						return nil, err
-					}
-					fieldsOut[k] = newFields
-				} else if values, ok := v.([]interface{}); ok {
-					for i, value := range values {
-						newFields, err := r.resolveFields(value, composableNamespace, cache)
-						if err != nil {
-							return nil, err
-						}
-						values[i] = newFields
-					}
-				}
-			}
-		}
-
-	case []map[string]interface{}, [][]interface{}:
-		if values, ok := fields.([]interface{}); ok {
-			for i, value := range values {
-				newFields, err := r.resolveFields(value, composableNamespace, cache)
-				if err != nil {
-					return nil, err
-				}
-				values[i] = newFields
-			}
-		}
-	default:
-		return fields, nil
-	}
-	return fields, nil
-}
-
-// NameMatchesResource checks if the given resource name/kind matches with API resource and its group
-func NameMatchesResource(kind string, resource metav1.APIResource, resGroup string) bool {
-	if strings.Contains(resource.Name, "/") {
-		// subresource
-		return false
-	}
-	lowerCaseName := strings.ToLower(kind)
-	if lowerCaseName == resource.Name ||
-		lowerCaseName == resource.SingularName ||
-		lowerCaseName == strings.ToLower(resource.Kind) ||
-		lowerCaseName == fmt.Sprintf("%s.%s", resource.Name, resGroup) {
-		return true
-	}
-	for _, shortName := range resource.ShortNames {
-		if lowerCaseName == strings.ToLower(shortName) {
-			return true
-		}
-	}
-	return false
-}
-
-func groupQualifiedName(name, group string) string {
-	if len(group) == 0 {
-		return name
-	}
-	return fmt.Sprintf("%s.%s", name, group)
-}
-
-func (r *composableReconciler) lookupAPIResource(objKind, apiVersion string) (*metav1.APIResource, *composableError) {
-	//r.log.V(1).Info("lookupAPIResource", "objKind", objKind, "apiVersion", apiVersion)
-	var resources []*metav1.APIResourceList
-	var err error
-	if len(apiVersion) > 0 {
-		list, err := r.discoveryClient.ServerResourcesForGroupVersion(apiVersion)
-		if err != nil {
-			r.log.Error(err, "lookupAPIResource", "apiVersion", apiVersion)
-			return nil, &composableError{err, false, true}
-		}
-		resources = []*metav1.APIResourceList{list}
-		//	r.log.V(1).Info("lookupAPIResource", "list", list, "apiVersion", apiVersion)
-	} else {
-		resources, err = r.discoveryClient.ServerPreferredResources()
-		if err != nil {
-			r.log.Error(err, "lookupAPIResource ServerPreferredResources")
-			return nil, &composableError{err, false, true}
-		}
-	}
-	var targetResource *metav1.APIResource
-	var matchedResources []string
-	coreGroupObject := false
-Loop:
-	for _, resourceList := range resources {
-		// The list holds the GroupVersion for its list of APIResources
-		gv, err := schema.ParseGroupVersion(resourceList.GroupVersion)
-		if err != nil {
-			r.log.Error(err, "Error parsing GroupVersion", "GroupVersion", resourceList.GroupVersion)
-			return nil, &composableError{err, false, true}
-		}
-
-		for _, resource := range resourceList.APIResources {
-			group := gv.Group
-			if NameMatchesResource(objKind, resource, group) {
-				if len(group) == 0 && len(apiVersion) == 0 {
-					// K8s core group object
-					coreGroupObject = true
-					targetResource = resource.DeepCopy()
-					targetResource.Group = group
-					targetResource.Version = gv.Version
-					coreGroupObject = true
-					break Loop
-				}
-				if targetResource == nil {
-					targetResource = resource.DeepCopy()
-					targetResource.Group = group
-					targetResource.Version = gv.Version
-				}
-				matchedResources = append(matchedResources, groupQualifiedName(resource.Name, gv.Group))
-			}
-		}
-	}
-	if !coreGroupObject && len(matchedResources) > 1 {
-		err = fmt.Errorf("Multiple resources are matched by %q: %s. A group-qualified plural name must be provided ", kind, strings.Join(matchedResources, ", "))
-		r.log.Error(err, "lookupAPIResource")
-		return nil, &composableError{err, false, false}
-	}
-
-	if targetResource != nil {
-		return targetResource, nil
-	}
-	err = fmt.Errorf("Unable to find api resource named %q ", kind)
-	r.log.Error(err, "lookupAPIResource")
-	return nil, &composableError{err, false, false}
-}
-
-func (r *composableReconciler) resolveValue(value interface{}, composableNamespace string, cache *composableCache) (interface{}, *composableError) {
-	//r.log.Info("resolveValue", "value", value)
-	var err error
-	if val, ok := value.(map[string]interface{}); ok {
-		if objKind, ok := val[kind].(string); ok {
-			apiversion := ""
-			if apiversion, ok = val[apiVersion].(string); !ok {
-				apiversion = ""
-			}
-			if path, ok := val[path].(string); ok {
-				if strings.HasPrefix(path, "{.") {
-
-					unstrObj, compErr := r.getInputObject(val, objKind, apiversion, composableNamespace, cache)
-					if compErr != nil {
-						if errors.IsNotFound(compErr.error) {
-							// we have checked the object and did not fined it
-							val, err1 := r.errorToDefaultValue(val, *compErr)
-							return val, err1
-						}
-						// we should not be here
-						return nil, compErr
-					}
-					return r.resolveValue2(val, *unstrObj, path)
-				}
-				err = fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is not jsonpath formated ")
-				r.log.Error(err, "resolveValue", "path", path)
-				return nil, &composableError{err, false, false}
-			}
-			err = fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is not defined ")
-			r.log.Error(err, "resolveValue", "val", val)
-			return nil, &composableError{err, false, false}
-		}
-		err = fmt.Errorf("Failed: getValueFrom is not well-formed, 'kind' is not defined ")
-		r.log.Error(err, "resolveValue", "val", val)
-		return nil, &composableError{err, false, false}
-	}
-	err = fmt.Errorf("Failed: getValueFrom is not well-formed, value type is not %T ", value)
-	r.log.Error(err, "resolveValue", "value", value)
-	return nil, &composableError{err, false, false}
-}
-
-func (r *composableReconciler) getInputObject(val map[string]interface{}, objKind, apiversion, composableNamespace string, cache *composableCache) (*unstructured.Unstructured, *composableError) {
-	res, compErr := r.lookupAPIResource(objKind, apiversion)
-	if compErr != nil {
-		// We cannot resolve input object API resource, so we return error even if a default value is set.
-		return nil, compErr
-	}
-	groupVersionKind := schema.GroupVersionKind{Kind: res.Kind, Version: res.Version, Group: res.Group}
-	var ns string
-	var ok bool
-	if res.Namespaced {
-		ns, ok = val[namespace].(string)
-		if !ok {
-			ns = composableNamespace
-		}
-	}
-	var err error
-	name, nameOK := val[name].(string)
-	intLabels, labelsOK := val[labels].(map[string]interface{})
-	if nameOK == labelsOK { // only one of them should be defined
-		if nameOK && labelsOK {
-			err = fmt.Errorf("Failed: getValueFrom is not well-formed, both 'name' and 'labels' cannot be defined ")
-		} else {
-			err = fmt.Errorf("Failed: getValueFrom is not well-formed, neither 'name' nor 'labels' are not defined  ")
-		}
-		r.log.Error(err, "getInputObject", "val", val)
-		return nil, &composableError{err, false, false}
-	}
-	key := objectKey(name, ns, intLabels, groupVersionKind)
-	if obj, ok := cache.objects[key]; ok {
-		switch obj.(type) {
-		case unstructured.Unstructured:
-			unstrObj := obj.(unstructured.Unstructured)
-			return &unstrObj, nil
-		case toumbstone:
-			ts := obj.(toumbstone)
-			return nil, &ts.err
-		default:
-			err = fmt.Errorf("wrong type of cached object %T", obj)
-			r.log.Error(err, "")
-			return nil, &composableError{err, false, false}
-		}
-	}
-	var unstrObj unstructured.Unstructured
-	if nameOK {
-		unstrObj.SetGroupVersionKind(groupVersionKind)
-		var objNamespacedname types.NamespacedName
-		if res.Namespaced {
-			objNamespacedname = types.NamespacedName{Namespace: ns, Name: name}
-		} else {
-			objNamespacedname = types.NamespacedName{Name: name}
-		}
-		r.log.V(1).Info("Get input object", "obj", objNamespacedname, "groupVersionKind", groupVersionKind)
-		err := r.Get(context.TODO(), objNamespacedname, &unstrObj)
-		if err != nil {
-			r.log.Info("Get object returned ", "err", err, "obj", objNamespacedname)
-			compErr = &composableError{err, true, true}
-			cache.objects[key] = toumbstone{err: *compErr}
-			return nil, compErr
-		}
-	} else { //labelsOK
-		strLabels := make(map[string]string)
-		for key, value := range intLabels {
-			strValue := fmt.Sprintf("%v", value)
-			strLabels[key] = strValue
-		}
-		unstrList := unstructured.UnstructuredList{}
-		unstrList.SetGroupVersionKind(groupVersionKind)
-		err = r.List(context.TODO(), &unstrList, client.InNamespace(ns), client.MatchingLabels(strLabels))
-		if err != nil {
-			r.log.Info("list object returned ", "err", err, "namespace", ns, "labels", strLabels, "groupVersionKind", groupVersionKind)
-			compErr = &composableError{err, true, true}
-			cache.objects[key] = toumbstone{err: *compErr}
-			return nil, compErr
-		}
-		itms := len(unstrList.Items)
-		if itms == 1 {
-			unstrObj = unstrList.Items[0]
-			cache.objects[key] = unstrObj
-		} else {
-			err = fmt.Errorf("list object returned %d items ", itms)
-			r.log.Error(err, "wrong # of items", "items", itms, "namespace", namespace, "labels", strLabels, "groupVersionKind", groupVersionKind)
-			compErr = &composableError{err, true, true}
-			cache.objects[key] = toumbstone{err: *compErr}
-			return nil, compErr
-		}
-	}
-	return &unstrObj, nil
-}
-
-func (r *composableReconciler) resolveValue2(val map[string]interface{}, unstrObj unstructured.Unstructured, path string) (interface{}, *composableError) {
-	j := jsonpath.New("compose")
-	// add ".Object" to the path
-	path = path[:1] + objectPrefix + path[1:]
-	err := j.Parse(path)
-	if err != nil {
-		r.log.Error(err, "jsonpath.Parse", "path", path)
-		return nil, &composableError{err, false, false}
-	}
-	j.AllowMissingKeys(false)
-
-	fullResults, err := j.FindResults(unstrObj)
-	if err != nil {
-		r.log.Error(err, "FindResults", "obj", unstrObj, "path", path)
-		if strings.Contains(err.Error(), "is not found") {
-			return r.errorToDefaultValue(val, composableError{err, true, true})
-		}
-		return nil, &composableError{err, false, false}
-	}
-	iface, ok := template.PrintableValue(fullResults[0][0])
-	if !ok {
-		err = fmt.Errorf("can't find printable value %v ", fullResults[0][0])
-		r.log.Error(err, "template.PrintableValue", "obj", unstrObj, "path", path)
-		return nil, &composableError{err, false, false}
-	}
-
-	var retVal interface{}
-	if transformers, ok := val[transformers].([]interface{}); ok && len(transformers) > 0 {
-		transformNames := make([]string, 0, len(transformers))
-		for _, v := range transformers {
-			if name, ok := v.(string); ok {
-				transformNames = append(transformNames, name)
-			}
-		}
-		retVal, err = CompoundTransformerNames(iface, transformNames...)
-	} else {
-		retVal = iface
-	}
-	return retVal, nil
-}
-
-func (r *composableReconciler) errorToDefaultValue(val map[string]interface{}, err composableError) (interface{}, *composableError) {
-	if defaultValue, ok := val[defaultValue]; ok {
-		return defaultValue, nil
-	}
-	return nil, &err
-}
-
 func getName(obj map[string]interface{}) (string, error) {
-	metadata := obj[metadata].(map[string]interface{})
-	if name, ok := metadata[name]; ok {
+	metadata := obj[sdk.Metadata].(map[string]interface{})
+	if name, ok := metadata[sdk.Name]; ok {
 		return name.(string), nil
 	}
 	return "", fmt.Errorf("Failed: Template does not contain name")
 }
 
 func getNamespace(obj map[string]interface{}) (string, error) {
-	metadata := obj[metadata].(map[string]interface{})
-	if namespace, ok := metadata[namespace]; ok {
+	metadata := obj[sdk.Metadata].(map[string]interface{})
+	if namespace, ok := metadata[sdk.Namespace]; ok {
 		return namespace.(string), nil
 	}
 	return "", fmt.Errorf("Failed: Template does not contain namespace")
@@ -725,8 +332,4 @@ func getState(obj map[string]interface{}) (string, error) {
 		return "", fmt.Errorf("Failed: Composable doesn't contain status")
 	}
 	return "", fmt.Errorf("Failed: Composable doesn't contain state")
-}
-
-func objectKey(name string, namespace string, labels map[string]interface{}, gvk schema.GroupVersionKind) string {
-	return fmt.Sprintf("%s/%s/%v/%s", name, namespace, labels, gvk.String())
 }
