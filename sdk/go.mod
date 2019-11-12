@@ -1,4 +1,4 @@
-module github.com/ibm/composable/sdk/v1
+module github.com/ibm/composable/sdk
 
 go 1.13
 

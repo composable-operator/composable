@@ -21,7 +21,7 @@ import (
 	"strconv"
 	"strings"
 
-	sdk "github.com/ibm/composable/sdk/v1"
+	sdk "github.com/ibm/composable/sdk"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"

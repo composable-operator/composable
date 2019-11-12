@@ -17,7 +17,7 @@
 package controllers
 
 import (
-	sdk "github.com/ibm/composable/sdk/v1"
+	sdk "github.com/ibm/composable/sdk"
 	"github.com/ibm/composable/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
