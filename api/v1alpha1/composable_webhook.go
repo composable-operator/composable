@@ -41,6 +41,8 @@ const (
 	OperationCreate = "CREATE"
 	// OperationUpdate - name of update operation
 	OperationUpdate = "UPDATE"
+	// getValueFrom - name of the composable reference element
+	getValueFrom = "getValueFrom"
 )
 
 // SetupWebhookWithManager sets up the webhooks with the manager
@@ -58,7 +60,7 @@ var _ webhook.Defaulter = &Composable{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *Composable) Default() {
-	composablelog.Info("default", "name", r.Name)
+	composablelog.Info("mutate - no implementation", "name", r.Name)
 
 	// TODO(user): fill in your defaulting logic.
 	// Laura: not implement in this version
@@ -148,9 +150,9 @@ func (r *Composable) findGetValueFrom(path *field.Path, m map[string]interface{}
 				allErrs = append(allErrs, err...)
 			}
 		case map[string]interface{}:
-			if vv["getValueFrom"] != nil {
-				if err := validateGetValueFrom(vv["getValueFrom"]); err != nil {
-					allErrs = append(allErrs, field.Invalid(mykey.Child("getValueFrom"), r.Name, err.Error()))
+			if vv[getValueFrom] != nil {
+				if err := validateGetValueFrom(vv[getValueFrom]); err != nil {
+					allErrs = append(allErrs, field.Invalid(mykey.Child(getValueFrom), r.Name, err.Error()))
 				}
 				// TODO: set the value to an appropriate type e.g. int, string, etc
 				m[k] = "abc"
@@ -179,9 +181,9 @@ func (r *Composable) findGetValueFrom2(path *field.Path, m []interface{}) field.
 				allErrs = append(allErrs, err...)
 			}
 		case map[string]interface{}:
-			if vv["getValueFrom"] != nil {
-				if err := validateGetValueFrom(vv["getValueFrom"]); err != nil {
-					allErrs = append(allErrs, field.Invalid(mykey.Child("getValueFrom"), r.Name, err.Error()))
+			if vv[getValueFrom] != nil {
+				if err := validateGetValueFrom(vv[getValueFrom]); err != nil {
+					allErrs = append(allErrs, field.Invalid(mykey.Child(getValueFrom), r.Name, err.Error()))
 				}
 				// TODO: set a random value of appropriate type for dry-run
 				m[k] = "abc2"
@@ -200,16 +202,28 @@ func (r *Composable) findGetValueFrom2(path *field.Path, m []interface{}) field.
 // validateGetValueFrom validates the syntax of input getValueFrom fields
 func validateGetValueFrom(v interface{}) error {
 	var missingItems []string
-	getValueFrom := ComposableGetValueFrom{}
+	message := ""
+	var labelsExist bool = false
 
+	getValueFrom := ComposableGetValueFrom{}
 	obj, err := json.Marshal(v)
 	if err != nil {
 		return fmt.Errorf("Invalid getValueFrom - %v", err.Error())
 	}
 	json.Unmarshal(obj, &getValueFrom)
-	if len(getValueFrom.Name) == 0 {
-		missingItems = append(missingItems, "name")
+
+	if val, ok := v.(map[string]interface{}); ok {
+		if _, ok := val["labels"].(map[string]interface{}); ok {
+			labelsExist = ok
+		}
 	}
+
+	if len(getValueFrom.Name) == 0 && !labelsExist {
+		missingItems = append(missingItems, "name or labels")
+	} else if len(getValueFrom.Name) > 0 && labelsExist {
+		message += "Cannot specify both name and labels (only one of them can be specified)"
+	}
+
 	if len(getValueFrom.Kind) == 0 {
 		missingItems = append(missingItems, "kind")
 	}
@@ -218,8 +232,12 @@ func validateGetValueFrom(v interface{}) error {
 	}
 	if len(missingItems) > 0 {
 		items := array2string(missingItems)
-		composablelog.Info("getValueFrom is INVALID", "missing", items)
-		return fmt.Errorf("Missing required field(s) - %v", items)
+		message += "Missing required field(s) - " + items
+	}
+
+	if len(message) > 0 {
+		composablelog.Info("validateGetValueFrom", "message", message)
+		return fmt.Errorf(message)
 	}
 	return nil
 }
