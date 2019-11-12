@@ -19,7 +19,7 @@ type ComposableError struct {
 //ComposableGetValueFrom is the struct for Composable getValueFrom
 type ComposableGetValueFrom struct {
 	Kind               string   `json:"kind"`
-	APIVersion         string   `json:"apiVersion"`
+	APIVersion         string   `json:"apiVersion,omitempty"`
 	Name               string   `json:"name"`
 	Namespace          string   `json:"namespace,omitempty"`
 	Path               string   `json:"path"`
