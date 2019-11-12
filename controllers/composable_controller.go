@@ -24,7 +24,7 @@ import (
 
 	"github.com/go-logr/logr"
 	ibmcloudv1alpha1 "github.com/ibm/composable/api/v1alpha1"
-	sdk "github.com/ibm/composable/sdk/v1"
+	sdk "github.com/ibm/composable/sdk"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
