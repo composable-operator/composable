@@ -23,7 +23,7 @@ spec:
           namespace: default
           path: '{.data.name}'
 
-      serviceClass: Event Streams
+      serviceClass: messagehub
       plan: 
         getValueFrom:
           kind: Secret

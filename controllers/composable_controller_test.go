@@ -17,6 +17,7 @@
 package controllers
 
 import (
+	sdk "github.com/ibm/composable/sdk"
 	"github.com/ibm/composable/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -152,7 +153,7 @@ var _ = Describe("test Composable operations", func() {
 		Ω(testSpec["objectValue"]).Should(Equal(map[string]interface{}{"family": "FamilyName", "first": "FirstName", "age": int64(27)}))
 
 		By("copy stringJson2Value")
-		val, _ := Array2CSStringTransformer(strArray)
+		val, _ := sdk.Array2CSStringTransformer(strArray)
 		Ω(testSpec["stringJson2Value"]).Should(BeEquivalentTo(val))
 
 	})
@@ -236,7 +237,7 @@ var _ = Describe("test Composable operations", func() {
 		Ω(testSpec["objectValue"]).Should(Equal(map[string]interface{}{"family": "FamilyName", "first": "FirstName", "age": int64(27)}))
 
 		By("check updated stringJson2Value")
-		val, _ := Array2CSStringTransformer(strArray)
+		val, _ := sdk.Array2CSStringTransformer(strArray)
 		Ω(testSpec["stringJson2Value"]).Should(BeEquivalentTo(val))
 	})
 })
@@ -359,7 +360,7 @@ var _ = Describe("Find input objects according their labels", func() {
 		fGetValueFrom := func(unstrObj unstructured.Unstructured) map[string]interface{} {
 			sp := unstrObj.Object[spec].(map[string]interface{})
 			v := sp["testValue"].(map[string]interface{})
-			return v[getValueFrom].(map[string]interface{})
+			return v[sdk.GetValueFrom].(map[string]interface{})
 		}
 		BeforeEach(func() {
 			By("deploy test Service")
@@ -380,8 +381,8 @@ var _ = Describe("Find input objects according their labels", func() {
 			unstrObj := unstructured.Unstructured{}
 			unstrObj.UnmarshalJSON(comp.Spec.Template.Raw)
 			valueFrom := fGetValueFrom(unstrObj)
-			delete(valueFrom, name)
-			delete(valueFrom, labels)
+			delete(valueFrom, sdk.Name)
+			delete(valueFrom, sdk.Labels)
 			comp.Spec.Template.Raw, _ = unstrObj.MarshalJSON()
 			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
@@ -415,7 +416,7 @@ var _ = Describe("Find input objects according their labels", func() {
 			unstrObj := unstructured.Unstructured{}
 			unstrObj.UnmarshalJSON(comp.Spec.Template.Raw)
 			valueFrom := fGetValueFrom(unstrObj)
-			delete(valueFrom, name)
+			delete(valueFrom, sdk.Name)
 			comp.Spec.Template.Raw, _ = unstrObj.MarshalJSON()
 			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
@@ -433,7 +434,7 @@ var _ = Describe("Find input objects according their labels", func() {
 			unstrObj := unstructured.Unstructured{}
 			unstrObj.UnmarshalJSON(comp.Spec.Template.Raw)
 			valueFrom := fGetValueFrom(unstrObj)
-			delete(valueFrom, name)
+			delete(valueFrom, sdk.Name)
 			comp.Spec.Template.Raw, _ = unstrObj.MarshalJSON()
 			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
@@ -448,8 +449,8 @@ var _ = Describe("Find input objects according their labels", func() {
 			unstrObj := unstructured.Unstructured{}
 			unstrObj.UnmarshalJSON(comp.Spec.Template.Raw)
 			valueFrom := fGetValueFrom(unstrObj)
-			delete(valueFrom, name)
-			lb := valueFrom[labels].(map[string]interface{})
+			delete(valueFrom, sdk.Name)
+			lb := valueFrom[sdk.Labels].(map[string]interface{})
 			delete(lb, "l1")
 			comp.Spec.Template.Raw, _ = unstrObj.MarshalJSON()
 			test.PostInNs(testContext, &comp, false, 0)
