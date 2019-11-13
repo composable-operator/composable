@@ -21,6 +21,7 @@ type ComposableGetValueFrom struct {
 	Kind               string   `json:"kind"`
 	APIVersion         string   `json:"apiVersion,omitempty"`
 	Name               string   `json:"name"`
+	Labels             []string `json:"labels"`
 	Namespace          string   `json:"namespace,omitempty"`
 	Path               string   `json:"path"`
 	FormatTransformers []string `json:"format-transformers,omitempty"`
