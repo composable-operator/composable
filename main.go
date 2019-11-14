@@ -73,7 +73,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if admissionControl {
+	if admissionControl == true || os.Getenv("ADMISSION_CONTROL") == "true" {
 		if err = (&ibmcloudv1alpha1.Composable{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Composable")
 			os.Exit(1)
