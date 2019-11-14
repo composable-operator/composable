@@ -28,17 +28,15 @@ Composable is an overlay operator that can wrap any resource (native Kubernetes 
 dynamically configurable. Any field of the underlying resource can be specified with a reference to any field of other 
 Kubernetes objects.
 
-The Composable Operator enables the complete declarative executable specification of collections of inter-dependent resources.
+A cloud application is composed of many heteregeneous resources whose deployment must often be staged. For example,
+a resource that depends on Kafka might have a field in its Spec expecting a Kafka Admin URL. In order to obtain a Kafka admin URL,
+Kafka itself must be first successfully deployed with its own operator. So the yamls that deploy Kafka and the resource cannot all be deployed at once. This is why deployment of whole applications requires a playbook, step-by-step instructions, or scripts that may be brittle and error-prone.
 
-## Installing Prerequisites
+The Composable operator allows all yamls of an application to be deployed at once, in one step, by supporting inter-yaml references.
+In the example above, the resource is wrapped in a Composable object as a template and the Kafka Admin URL field has a reference
+to another object that will eventually hold the required data. When this data becomes available the Composable controller deploys its underlying
+resource. The composable operator therefore uses native Kubernetes mechanisms to dynamically stage deployments of a collection of resources.
 
-Composable operator v0.1.2 has an integrated admission control webhook to perform validation of the reference specifications in Composable. The webhook must be served via HTTPS with proper certificates. As a prerequisite [cert-manager](https://docs.cert-manager.io/en/latest/getting-started/install/kubernetes.html#) must be installed in your cluster to manage certificate creation and injection.  
-
-To install cert-manager, run the following script:
-
-```bash
-curl -sL https://raw.githubusercontent.com/IBM/composable/master/hack/install-cert-manager.sh | bash
-```
 
 ## Installation Composable
 
@@ -59,9 +57,9 @@ curl -sL https://raw.githubusercontent.com/IBM/composable/master/hack/uninstall-
 ## Examples
 
 Here we provide several examples of Composable usage, of course its possible usage is not restricted by the provided use 
-cases. More other can be added later. 
+cases. Others can be added later. 
 
-File with all examples can be found in [samples](./config/samples)
+Folder with all examples can be found in [samples](./config/samples)
    
 ### An example when a Kubernetes `ConfigMap` created based on a Kubernetes Service
 Let's assume that we have a Kubernetes `Service`, which is part of another deployment, but we would like to create an automatic 
