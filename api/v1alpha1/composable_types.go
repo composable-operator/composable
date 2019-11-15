@@ -42,7 +42,6 @@ type ComposableStatus struct {
 	Message string `json:"message,omitempty"`
 }
 
-// Composable is the Schema for the Composables API
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:path=composables,scope=Namespaced,shortName=comp
 // +kubebuilder:printcolumn:name="State",type=string,JSONPath=".status.state"
@@ -50,8 +49,8 @@ type ComposableStatus struct {
 // +kubebuilder:printcolumn:name="Resource Kind",type=string,JSONPath=".spec.template.kind"
 // +kubebuilder:printcolumn:name="Resource apiVersion",type=string,JSONPath=".spec.template.apiVersion"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
-
-// Composable represents a composable resource that can wrap any resource (native kubernetes or CRDs) to allow it dynamically configurable
+// +kubebuilder:subresource:status
+// Composable represents a composable resource that can wrap any resource (native kubernetes or CRDs) to allow it to be dynamically configurable
 type Composable struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata"`

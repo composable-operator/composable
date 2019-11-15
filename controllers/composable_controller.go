@@ -131,7 +131,8 @@ func (r *composableReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 			r.log.V(1).Info("Set status", "desired status", status, "object", req)
 			compInstance.Status.State = status.State
 			compInstance.Status.Message = status.Message
-			if err := r.Update(context.Background(), compInstance); err != nil {
+			if err := r.Status().Update(context.Background(), compInstance); err != nil {
+				r.log.Info("Error in Update", "request", err.Error())
 				r.log.Error(err, "Update status", "desired status", status, "object", req, "compInstance", compInstance)
 			}
 		}
