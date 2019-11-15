@@ -3,11 +3,11 @@
 **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
 - [Composable Operator](#composable-operator)
-  - [Installation Composable](#installation-composable)
+  - [Installing Composable](#installing-composable)
   - [Removing Composable](#removing-composable)
   - [Examples](#examples)
-    - [An example when a Kubernetes `ConfigMap` created based on a Kubernetes Service](#an-example-when-a-kubernetes-configmap-created-based-on-a-kubernetes-service)
-    - [An example of Service.ibmcloud.ibm.com](#an-example-of-serviceibmcloudibmcom)
+    - [`ConfigMap` created based on a Kubernetes Service](#configmap-created-based-on-a-kubernetes-service)
+    - [IBM Cloud Service plan specified dynamically](#ibm-cloud-service-plan-specified-dynamically)
   - [getValueFrom elements](#getvaluefrom-elements)
   - [The input object group and version discovery algorithm](#the-input-object-group-and-version-discovery-algorithm)
   - [Format transformers](#format-transformers)
@@ -24,21 +24,83 @@ environment variable to `on`. [How to Install and Activate Module Support](https
  
 # Composable Operator
 
-Composable is an overlay operator that can wrap any resource (native Kubernetes or CRD instance) and allows it to be 
-dynamically configurable. Any field of the underlying resource can be specified with a reference to any field of other 
-Kubernetes objects.
+Kubernetes object specifications often require constant values for their fields. When deploying an entire application
+with many different resources, this limitation often results in the need for staged deployments, because some resources
+have to be deployed first in order to determine what data to provide for the specifications of dependent resources.
+This undermines the declarative nature of Kubernetes object specification and requires workflows, manual step-by-step
+instructions and/or brittle automated scripts for the deployment of applications as a whole.
 
-A cloud application is composed of many heteregeneous resources whose deployment must often be staged. For example,
-a resource that depends on Kafka might have a field in its Spec expecting a Kafka Admin URL. In order to obtain a Kafka admin URL,
-Kafka itself must be first successfully deployed with its own operator. So the yamls that deploy Kafka and the resource cannot all be deployed at once. This is why deployment of whole applications requires a playbook, step-by-step instructions, or scripts that may be brittle and error-prone.
+The Composable operator alleviates this problem by wrapping any resource (native Kubernetes or CRD instance) and
+allowing it to be specified with references to fields of other objects. These references are resolved dynamically
+by the Compsable controller when the data becomes available. This allows the yaml for the entire application to
+be deployed at once regardless of dependencies, and lets Kubernetes native mechanisms to stage the deployment
+of different resources.
 
-The Composable operator allows all yamls of an application to be deployed at once, in one step, by supporting inter-yaml references.
-In the example above, the resource is wrapped in a Composable object as a template and the Kafka Admin URL field has a reference
-to another object that will eventually hold the required data. When this data becomes available the Composable controller deploys its underlying
-resource. The composable operator therefore uses native Kubernetes mechanisms to dynamically stage deployments of a collection of resources.
+For example, consider a `Knative` `KafkaSource` resource:
+
+```yaml
+apiVersion: sources.eventing.knative.dev/v1alpha1
+kind: KafkaSource
+metadata:
+  name: kafka-source
+spec:
+  consumerGroup: knative-group
+  bootstrapServers: my-cluster-kafka-bootstrap.kafka:9092
+  topics: knative-demo-topic
+  sink:
+    apiVersion: serving.knative.dev/v1
+    kind: Service
+    name: event-display
+```
+
+The `KafkaSource` resource requires a field `bootstrapServers` whose value can only be known if a Kafka service has already
+been deployed successfully. So one must first deploy Kafka, obtain this data, then create the above yaml and deploy it.
+
+With the Composable operator, this yaml can be deployed at the same time as the rest of the application, as follows:
+
+```yaml
+apiVersion: ibmcloud.ibm.com/v1alpha1
+kind: Composable
+metadata:
+  name: kafka-source
+spec:
+  template:
+    apiVersion: sources.eventing.knative.dev/v1alpha1
+    kind: KafkaSource
+    metadata:
+      name: kafka-source
+    spec:
+      consumerGroup: knative-group
+      bootstrapServers:
+        getValueFrom:
+          kind: Secret
+          name: my-kafka-binding
+          path: '{.data.kafka_brokers_sasl}'
+          format-transformers:
+          - "Base64ToString" 
+          - "JsonToObject"
+          - "ArrayToCSString"
+      topics: knative-demo-topic
+      sink:
+        apiVersion: serving.knative.dev/v1
+        kind: Service
+        name: event-display
+```
+
+With Composable as the wrapper object, the field `bootstrapServers` can be specified with a reference `getValueFrom` to another object,
+in this case a secret named `my-kafka-binding` that contains binding information for the Kafka service (created by a different operator).
+When the Composable object is deployed, the Composable controller tries to resolve this value and keeps trying if the secret has not
+been created yet. Once the secret is created and the data becomes available, the Composable operator then deploys the underlying object.
+
+Often there is data formatting mismatch between a source and a referencing field, so Composable also provides a series of handy
+data transformers that can be piped together in order to obtain the correct format. In this case, the `base64` data is first decoded to
+obtain a Json string, which is transformed to an array object, and finally transformed into a CSS string.
+
+The Composable operator allows all yamls of an application to be deployed at once, in one step, by supporting inter-yaml references
+that are resolved dynamically, and leverages native Kubernetes mechanisms to stage the deployment of a collection of resources.
 
 
-## Installation Composable
+## Installing Composable
 
 To install the latest release of Composable, run the following script:
 
@@ -56,15 +118,12 @@ curl -sL https://raw.githubusercontent.com/IBM/composable/master/hack/uninstall-
 ```
 ## Examples
 
-Here we provide several examples of Composable usage, of course its possible usage is not restricted by the provided use 
-cases. Others can be added later. 
-
-Folder with all examples can be found in [samples](./config/samples)
-   
-### An example when a Kubernetes `ConfigMap` created based on a Kubernetes Service
+Here we provide several small examples of Composable usage. See [samples](./config/samples) for more samples.
+  
+### `ConfigMap` created based on a Kubernetes Service
 Let's assume that we have a Kubernetes `Service`, which is part of another deployment, but we would like to create an automatic 
 binding of our deployment objects with this `Service`. With help of `Composable` we can automatically create a `ConfigMap` 
-with a `Service` parameter(s), e.g. the port number, whose name is `http`     
+with a `Service` parameter(s), e.g. the port number, whose name is `http`.     
 
 The `Service` yaml [file](./config/samples/myService.yaml) might looks like:
 
@@ -112,11 +171,11 @@ spec:
 You can see the detail explanation of the `getValueForm` fields below, but the purpose of the object is to create a  
 `ConfigMap` named `myconfigmap` and set `servicePort` to be equal to the port named `http` in the `Service` object named
 `myservice` in the `default` namespace.  
-A Composable  and a created object (`myconfigmap`) will be in teh same namespace, but input objects can be in any namespaces.
+A Composable  and a created object (`myconfigmap`) will be in the same namespace, but input objects can be in any namespaces.
 
-### An example of Service.ibmcloud.ibm.com
+### IBM Cloud Service plan specified dynamically
 
-Composable-operator project works tightly with 2 other related projects: [SolSA - Solution Service Architecture](https://github.com/IBM/solsa)
+The Composable operator project works tightly with 2 other related projects: [SolSA - Solution Service Architecture](https://github.com/IBM/solsa)
 and [cloud-operators](https://github.com/IBM/cloud-operators). The [samples](./config/samples) directory has 3 different 
 examples of creation/configuration of `Service.ibmcloud.ibm.com` from the `cloud-opertors` project.
 
@@ -186,7 +245,7 @@ spec:
  Moreover, it can be used to configure with data that is computed dynamically as a result of the deployment of some other 
  resource.
  
- The `getValueFrom` element can point to any K8s and its extensions object. The kind of the object is defined by the`kind` 
+ The `getValueFrom` element can point to any K8s and its extensions object. The kind of the object is defined by the `kind` 
  element; the object name is defined by the `name` elements, and finally, the path to the data is defined by the value of
  the `path` element, which is a string with dots as a delimiter. 
  
@@ -255,7 +314,7 @@ format-transformers:
 The `getValueFrom` definition includes the destination `namespace`, the specified namespace is used 
 to look up the referenced object. Otherwise, the `namespace` of the `Composable` object is checked.
 
-The template object should be created in the same n`amespaces` as the `Composable` object. Therefore, we recommend do not
+The template object should be created in the same `namespaces` as the `Composable` object. Therefore, we recommend do not
 define `namespace` in the template. If the namespace field is defined and its value does not equal to the `Composable`
 object namespace, no objects will be created, and `Composable` object status will contain an error.  
 

@@ -1,0 +1,26 @@
+apiVersion: ibmcloud.ibm.com/v1alpha1
+kind: Composable
+metadata:
+  name: kafka-source
+spec:
+  template:
+    apiVersion: sources.eventing.knative.dev/v1alpha1
+    kind: KafkaSource
+    metadata:
+      name: kafka-source
+    spec:
+      consumerGroup: knative-group
+      bootstrapServers:
+        getValueFrom:
+          kind: Secret
+          name: my-kafka-binding
+          path: '{.data.kafka_brokers_sasl}'
+          format-transformers:
+          - "Base64ToString" 
+          - "JsonToObject"
+          - "ArrayToCSString"
+      topics: knative-demo-topic
+      sink:
+        apiVersion: serving.knative.dev/v1
+        kind: Service
+        name: event-display

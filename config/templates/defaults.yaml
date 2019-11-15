@@ -14,23 +14,7 @@ crd:
               "name": "comp"
             },
             "spec": {
-              "template": { 
-                "apiVersion": "ibmcloud.ibm.com/v1alpha1",
-                "kind": "Service",
-                "metadata": {
-                  "name": "mytranslator"
-                },
-                "spec": {
-                  "serviceClass": "language-translator",
-                  "plan": {
-                    "getValueFrom": {
-                      "kind": "configmap",
-                      "name": "myconfigmap",
-                      "data": "{data.key}"
-                    }
-                  }
-                }
-              }
+              "a": "b"
             }
           }
       resources:
