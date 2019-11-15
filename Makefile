@@ -94,7 +94,26 @@ ifeq (, $(shell which golint))
 endif
 	golint -set_exit_status=true api/ controllers/
 
+# Run the operator-sdk scorecard on latest release
+scorecard:
+	hack/operator-scorecard.sh 
+
+# Push OLM metadata to private Quay registry
+push-olm: check-tag check-quaytoken check-quayns
+	operator-courier push olm/v${TAG} ${QUAY_NS} composable-operator ${TAG} "${QUAY_TOKEN}"
+	@echo Remember to make https://quay.io/application/${QUAY_NS}/composable public
+
 check-tag:
 ifndef TAG
 	$(error TAG is undefined! Please set TAG to the latest release tag, using the format x.y.z e.g. export TAG=0.1.1 )
+endif
+
+check-quayns:
+ifndef QUAY_NS
+	$(error QUAY_NS is undefined!) 
+endif
+
+check-quaytoken:
+ifndef QUAY_TOKEN
+	$(error QUAY_TOKEN is undefined!) 
 endif

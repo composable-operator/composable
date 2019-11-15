@@ -102,6 +102,7 @@ ix += 1
 # copy crds
 crds = os.path.join(config,"crd", "bases")
 for filename in os.listdir(crds):
+    print(filename)
     new_name = "%03d_%s" % (ix,filename)
     shutil.copyfile(os.path.join(crds,filename),os.path.join(releases,new_name))
     ix += 1
@@ -152,7 +153,7 @@ ix += 1
 # iterate sources
 for filename in os.listdir(releases):
     # we want only crds
-    if (filename.find("v1alpha1")<0):
+    if (filename.find("ibmcloud.ibm.com")<0):
         continue
     shutil.copyfile(os.path.join(releases,filename),os.path.join(olm,rename_crd(filename)))
 
