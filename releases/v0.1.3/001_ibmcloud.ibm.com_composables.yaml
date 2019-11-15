@@ -29,11 +29,12 @@ spec:
     shortNames:
     - comp
   scope: Namespaced
-  subresources: {}
+  subresources:
+    status: {}
   validation:
     openAPIV3Schema:
       description: Composable represents a composable resource that can wrap any resource
-        (native kubernetes or CRDs) to allow it dynamically configurable
+        (native kubernetes or CRDs) to allow it to be dynamically configurable
       properties:
         apiVersion:
           description: 'APIVersion defines the versioned schema of this representation
