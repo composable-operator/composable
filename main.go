@@ -47,13 +47,10 @@ func init() {
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
-	var admissionControl bool
 
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
-	flag.BoolVar(&admissionControl, "enable-admission-control", false,
-		"Enable admission control.")
 	flag.Parse()
 
 	ctrl.SetLogger(zapr.NewLogger(contrZap.RawLoggerTo(os.Stderr, true, zap.AddCaller())))
@@ -73,7 +70,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if admissionControl {
+	if os.Getenv("ADMISSION_CONTROL") == "true" {
 		if err = (&ibmcloudv1alpha1.Composable{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Composable")
 			os.Exit(1)

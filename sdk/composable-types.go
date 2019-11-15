@@ -20,8 +20,8 @@ type ComposableError struct {
 type ComposableGetValueFrom struct {
 	Kind               string   `json:"kind"`
 	APIVersion         string   `json:"apiVersion,omitempty"`
-	Name               string   `json:"name"`
-	Labels             []string `json:"labels"`
+	Name               string   `json:"name,omitempty"`
+	Labels             []string `json:"labels,omitempty"`
 	Namespace          string   `json:"namespace,omitempty"`
 	Path               string   `json:"path"`
 	FormatTransformers []string `json:"format-transformers,omitempty"`
