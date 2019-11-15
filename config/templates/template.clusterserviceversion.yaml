@@ -80,8 +80,8 @@ spec:
                 kind: Service
                 name: event-display
                 
-    With Composable as the wrapper object, the field bootstrapServers can be specified with a reference getValueFrom to another object,
-    in this case a secret named my-kafka-binding that contains binding information for the Kafka service (created by a different operator).
+    With Composable as the wrapper object, the field `bootstrapServers` can be specified with a reference `getValueFrom` to another object,
+    in this case a secret named `my-kafka-binding` that contains binding information for the Kafka service (created by a different operator).
     When the Composable object is deployed, the Composable controller tries to resolve this value and keeps trying if the secret has not
     been created yet. Once the secret is created and the data becomes available, the Composable operator then deploys the underlying object.
      
@@ -102,7 +102,7 @@ spec:
     ## Using the Composable Operator
 
     For additional configuration options, samples and more information on using the operator, consult 
-    the [IBM Cloud Operator documentation](https://github.com/IBM/composable).
+    the [Composable Operator documentation](https://github.com/IBM/composable).
 
   keywords: ['IBM','Cloud']
   version: PLACEHOLDER

@@ -8,7 +8,7 @@ metadata:
     categories: Cloud Provider
     certified: 'false'
     containerImage: cloudoperators/composable-controller:0.1.3
-    createdAt: '2019-11-15T11:35:40Z'
+    createdAt: '2019-11-15T13:08:11Z'
     description: Operator that can wrap any resource to make it dynamically configurable
     repository: https://github.com/IBM/composable
     support: IBM
@@ -80,8 +80,8 @@ spec:
     \ \"ArrayToCSString\"\n          topics: knative-demo-topic\n          sink:\n\
     \            apiVersion: serving.knative.dev/v1\n            kind: Service\n \
     \           name: event-display\n            \nWith Composable as the wrapper\
-    \ object, the field bootstrapServers can be specified with a reference getValueFrom\
-    \ to another object, in this case a secret named my-kafka-binding that contains\
+    \ object, the field `bootstrapServers` can be specified with a reference `getValueFrom`\
+    \ to another object, in this case a secret named `my-kafka-binding` that contains\
     \ binding information for the Kafka service (created by a different operator).\
     \ When the Composable object is deployed, the Composable controller tries to resolve\
     \ this value and keeps trying if the secret has not been created yet. Once the\
@@ -99,7 +99,7 @@ spec:
     \ repository](https://github.com/IBM/composable).\n## Requirements\nThe operator\
     \ can be installed on any OLM-enabled Kubernetes cluster with version >= 1.11.\
     \ \n## Using the Composable Operator\nFor additional configuration options, samples\
-    \ and more information on using the operator, consult  the [IBM Cloud Operator\
+    \ and more information on using the operator, consult  the [Composable Operator\
     \ documentation](https://github.com/IBM/composable).\n"
   displayName: Composable
   icon:
