@@ -50,7 +50,7 @@ type ComposableStatus struct {
 // +kubebuilder:printcolumn:name="Resource Kind",type=string,JSONPath=".spec.template.kind"
 // +kubebuilder:printcolumn:name="Resource apiVersion",type=string,JSONPath=".spec.template.apiVersion"
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=".metadata.creationTimestamp"
-
+// +kubebuilder:subresource:status
 // Composable represents a composable resource that can wrap any resource (native kubernetes or CRDs) to allow it dynamically configurable
 type Composable struct {
 	metav1.TypeMeta   `json:",inline"`
