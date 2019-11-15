@@ -96,6 +96,7 @@ func (r *composableReconciler) setController(controller controller.Controller) {
 
 // Reconcile loop method
 // +kubebuilder:rbac:groups=*,resources=*,verbs=*
+// +kubebuilder:rbac:groups=ibmcloud.ibm.com,resources=composables/status,verbs=get;list;watch;create;update;patch;delete
 func (r *composableReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
 	_ = r.log.WithValues("composable", req.NamespacedName)
