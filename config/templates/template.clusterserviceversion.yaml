@@ -29,7 +29,7 @@ spec:
     The Composable operator alleviates this problem by wrapping any resource (native Kubernetes or CRD instance) and
     allowing it to be specified with references to fields of other objects. These references are resolved dynamically
     by the Compsable controller when the data becomes available. This allows the yaml for the entire application to
-    be deployed at once regardless of dependencies, and lets Kubernetes native mechanisms to stage the deployment
+    be deployed at once regardless of dependencies, and leverages Kubernetes native mechanisms to stage the deployment
     of different resources. 
     
     For example, consider a Knative KafkaSource resource:
@@ -40,7 +40,7 @@ spec:
           name: kafka-source
         spec:
           consumerGroup: knative-group
-          bootstrapServers: my-cluster-kafka-bootstrap.kafka:9092
+          bootstrapServers: my-cluster-kafka-bootstrap.kafka:9092,my-cluster0-kafka-bootstrap.kafka:9093
           topics: knative-demo-topic
         sink:
           apiVersion: serving.knative.dev/v1
@@ -86,10 +86,10 @@ spec:
     been created yet. Once the secret is created and the data becomes available, the Composable operator then deploys the underlying object.
      
     Often there is data formatting mismatch between a source and a referencing field, so Composable also provides a series of handy
-    data transformers that can be piped together in order to obtain the correct format. In this case, the base64 data is first decoded to
-    obtain a Json string, which is transformed to an array object, and finally transformed into a CSS string.
+    data transformers that can be piped together in order to obtain the correct format. In this case, the base64 secret data is first decoded 
+    to obtain a Json string, which is then parsed producing an array of urls. Finally this array is transformed into a comma-separated string.
      
-    The Composable operator allows all yamls of an application to be deployed at once, in one step, by supporting inter-yaml references
+    The Composable operator allows all yamls of an application to be deployed at once, in one step, by supporting cross-resource references
     that are resolved dynamically, and leverages native Kubernetes mechanisms to stage the deployment of a collection of resources.
      
     The Composable Operator is currently in preview. It will get updated

@@ -18,6 +18,7 @@ package main
 import (
 	"flag"
 	"os"
+	"time"
 
 	"github.com/go-logr/zapr"
 	ibmcloudv1alpha1 "github.com/ibm/composable/api/v1alpha1"
@@ -55,10 +56,12 @@ func main() {
 
 	ctrl.SetLogger(zapr.NewLogger(contrZap.RawLoggerTo(os.Stderr, true, zap.AddCaller())))
 
+	syncPeriod := 1 * time.Minute // set a sync period
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
 		LeaderElection:     enableLeaderElection,
+		SyncPeriod:         &syncPeriod,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
