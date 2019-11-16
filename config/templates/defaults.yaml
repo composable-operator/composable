@@ -14,7 +14,7 @@ crd:
               "name": "comp"
             },
             "spec": {
-              "a": "b"
+              "template": "placeholder"
             }
           }
       resources:
