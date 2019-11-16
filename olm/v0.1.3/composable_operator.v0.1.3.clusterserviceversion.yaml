@@ -3,12 +3,12 @@ kind: ClusterServiceVersion
 metadata:
   annotations:
     alm-examples: |-
-      [{"apiVersion": "ibmcloud.ibm.com/v1alpha1", "kind": "Composable", "metadata": {"name": "comp"}, "spec": {"a": "b"}}]
+      [{"apiVersion": "ibmcloud.ibm.com/v1alpha1", "kind": "Composable", "metadata": {"name": "comp"}, "spec": {"template": {"apiVersion": "ibmcloud.ibm.com/v1alpha1", "kind": "Service"}}}]
     capabilities: Basic Install
     categories: Cloud Provider
     certified: 'false'
     containerImage: cloudoperators/composable-controller:0.1.3
-    createdAt: '2019-11-15T15:58:15Z'
+    createdAt: '2019-11-16T09:16:35Z'
     description: Operator that can wrap any resource to make it dynamically configurable
     repository: https://github.com/IBM/composable
     support: IBM
