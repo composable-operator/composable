@@ -14,7 +14,10 @@ crd:
               "name": "comp"
             },
             "spec": {
-              "template": "placeholder"
+              "template": {
+                "apiVersion": "ibmcloud.ibm.com/v1alpha1",
+                "kind": "Service"
+               }
             }
           }
       resources:
