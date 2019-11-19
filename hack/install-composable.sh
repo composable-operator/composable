@@ -16,19 +16,7 @@
 #
 
 
-# check if cert-manager is installed
-echo "Checking the prerequisite cert-manager... "
-CERT=$(kubectl get crd | grep -c ^certificates.certmanager.k8s.io)
-CERTREQ=$(kubectl get crd | grep -c ^certificaterequests.certmanager.k8s.io)
-ISSUER=$(kubectl get crd | grep -c ^issuers.certmanager.k8s.io)
-if [[ "$CERT" -lt 1 || "$CERTREQ" -lt 1 || "$ISSUER" -lt 1 ]]
-then 
-  echo "Missing prerequisites: cert-manager"
-  echo "Please run this command to install cert-manager:"
-  echo "  curl -sL https://raw.githubusercontent.com/IBM/composable/master/hack/install-cert-manager.sh | bash"
-  exit
-else echo "Good, found cert-manager in your cluster"
-fi
+
 
 set -e
 
