@@ -17,7 +17,7 @@ type ComposableError struct {
 }
 
 //ComposableGetValueFrom is the struct for Composable getValueFrom
-type ComposableGetValueFrom struct {
+type composableGetValueFrom struct {
 	Kind               string   `json:"kind"`
 	APIVersion         string   `json:"apiVersion,omitempty"`
 	Name               string   `json:"name,omitempty"`
@@ -25,4 +25,15 @@ type ComposableGetValueFrom struct {
 	Namespace          string   `json:"namespace,omitempty"`
 	Path               string   `json:"path"`
 	FormatTransformers []string `json:"format-transformers,omitempty"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// Binding is the Schema for the bindings API
+// +k8s:openapi-gen=true
+
+// GetValueFrom is the type that would appear in a CRD to allow dynamic configuration
+type GetValueFrom struct {
+	GetValueFrom composableGetValueFrom `json:"getValueFrom"`
 }
