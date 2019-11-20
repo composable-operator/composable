@@ -30,6 +30,6 @@ type ComposableGetValueFrom struct {
 
 // +kubebuilder:object:root=true
 // GetValueFrom is the type that would appear in a CRD to allow dynamic configuration
-type GetValueFrom struct {
+type GetValueFromType struct {
 	GetValueFrom ComposableGetValueFrom `json:"getValueFrom"`
 }
