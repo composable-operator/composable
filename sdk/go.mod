@@ -3,6 +3,8 @@ module github.com/ibm/composable/sdk
 go 1.12
 
 require (
+	github.com/onsi/ginkgo v1.6.0
+	github.com/onsi/gomega v1.4.2
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45 // indirect
 	google.golang.org/appengine v1.5.0 // indirect
 	k8s.io/apimachinery v0.0.0-20191111054156-6eb29fdf75dc
