@@ -35,6 +35,46 @@ const (
 	objectPrefix = ".Object"
 )
 
+func GetIntField(object unstructured.Unstructured, fieldname string) (int, error) {
+	if object.Object[fieldname] == nil {
+		return 0, fmt.Errorf("No such field: %s", fieldname)
+	}
+	value, ok := object.Object[fieldname].(int)
+	if !ok {
+		return 0, fmt.Errorf("Not an int: %s", fieldname)
+	}
+	return value, nil
+}
+
+func GetInt32Field(object unstructured.Unstructured, fieldname string) (int32, error) {
+	if object.Object[fieldname] == nil {
+		return 0, fmt.Errorf("No such field: %s", fieldname)
+	}
+	value, ok := object.Object[fieldname].(int32)
+	if !ok {
+		return 0, fmt.Errorf("Not an int: %s", fieldname)
+	}
+	return value, nil
+}
+
+func GetStringField(object unstructured.Unstructured, fieldname string) (string, error) {
+	if object.Object[fieldname] == nil {
+		return "", fmt.Errorf("No such field: %s", fieldname)
+	}
+	value, ok := object.Object[fieldname].(string)
+	if !ok {
+		return "", fmt.Errorf("Not a string: %s", fieldname)
+	}
+	return value, nil
+}
+
+func GetObjectField(object unstructured.Unstructured, fieldname string) (interface{}, error) {
+	if object.Object[fieldname] == nil {
+		return "", fmt.Errorf("No such field: %s", fieldname)
+	}
+	return object.Object[fieldname], nil
+}
+
 
 func Resolve(r client.Client, cfg *rest.Config, object interface{}, composableNamespace string) (unstructured.Unstructured, *ComposableError) {
 	objMap := object.(map[string]interface{})

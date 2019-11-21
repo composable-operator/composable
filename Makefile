@@ -55,6 +55,9 @@ vet:
 generate: controller-gen
 	$(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths="./..."
 
+generate-sdk: controller-gen
+	cd sdk & $(CONTROLLER_GEN) object:headerFile=./hack/boilerplate.go.txt paths="./..."
+
 # Build the docker image
 #docker-build: test
 #	docker build . -t ${IMG}
