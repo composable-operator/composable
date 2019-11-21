@@ -16,7 +16,7 @@ type ComposableError struct {
 	IsRetrievable bool
 }
 
-// +kubebuilder:object:root=true
+// +kubebuilder:object:generate=true
 //ComposableGetValueFrom is the struct for Composable getValueFrom
 type ComposableGetValueFrom struct {
 	Kind               string   `json:"kind"`
@@ -28,7 +28,7 @@ type ComposableGetValueFrom struct {
 	FormatTransformers []string `json:"format-transformers,omitempty"`
 }
 
-// +kubebuilder:object:root=true
+// +kubebuilder:object:generate=true
 // GetValueFrom is the type that would appear in a CRD to allow dynamic configuration
 type GetValueFromType struct {
 	GetValueFrom ComposableGetValueFrom `json:"getValueFrom"`

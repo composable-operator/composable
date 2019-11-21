@@ -18,7 +18,6 @@ require (
 	github.com/spf13/pflag v1.0.3 // indirect
 	go.uber.org/zap v1.12.0
 	golang.org/x/net v0.0.0-20190620200207-3b0461eec859
-	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45 // indirect
 	golang.org/x/sys v0.0.0-20190429190828-d89cdac9e872 // indirect
 	golang.org/x/text v0.3.2 // indirect
 	k8s.io/api v0.0.0-20190409021203-6e4e0e4f393b
