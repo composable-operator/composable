@@ -162,12 +162,8 @@ func (r *composableReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 
 	if compError != nil {
 		status.Message = compError.Error.Error()
-		if compError.IsPendable {
-			status.State = PendingStatus
-			return ctrl.Result{}, nil
-		}
 		status.State = FailedStatus
-		if compError.IsRetrievable {
+		if compError.ShouldBeReturned {
 			return ctrl.Result{}, compError.Error
 		}
 		return ctrl.Result{}, nil

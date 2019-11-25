@@ -2,12 +2,15 @@ package v1
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
+	"github.com/spf13/cast"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
@@ -35,53 +38,45 @@ const (
 	objectPrefix = ".Object"
 )
 
-func GetIntField(object unstructured.Unstructured, fieldname string) (int, error) {
-	if object.Object[fieldname] == nil {
-		return 0, fmt.Errorf("No such field: %s", fieldname)
+// ResolveObject resolves the object into resolved
+func ResolveObject(r client.Client, config *rest.Config, object interface{}, resolved interface{}, composableNamespace string) *ComposableError {
+	var objectMap map[string]interface{}
+	inrec, err := json.Marshal(object)
+	if err != nil {
+		return &ComposableError{err, false}
 	}
-	value, ok := object.Object[fieldname].(int)
-	if !ok {
-		return 0, fmt.Errorf("Not an int: %s", fieldname)
+
+	err = json.Unmarshal(inrec, &objectMap)
+	if err != nil {
+		return &ComposableError{err, false}
 	}
-	return value, nil
+
+	unstructured, comperr := Resolve(r, config, objectMap, composableNamespace)
+	if comperr != nil {
+		return comperr
+	}
+
+	inrec, err = json.Marshal(unstructured.Object)
+	if err != nil {
+		return &ComposableError{err, false}
+	}
+
+	err = json.Unmarshal(inrec, &resolved)
+	if err != nil {
+		return &ComposableError{err, false}
+	}
+
+	logf.Info("!!!!", "resolved", resolved)
+	return nil
 }
 
-func GetInt32Field(object unstructured.Unstructured, fieldname string) (int32, error) {
-	if object.Object[fieldname] == nil {
-		return 0, fmt.Errorf("No such field: %s", fieldname)
-	}
-	value, ok := object.Object[fieldname].(int32)
-	if !ok {
-		return 0, fmt.Errorf("Not an int: %s", fieldname)
-	}
-	return value, nil
-}
-
-func GetStringField(object unstructured.Unstructured, fieldname string) (string, error) {
-	if object.Object[fieldname] == nil {
-		return "", fmt.Errorf("No such field: %s", fieldname)
-	}
-	value, ok := object.Object[fieldname].(string)
-	if !ok {
-		return "", fmt.Errorf("Not a string: %s", fieldname)
-	}
-	return value, nil
-}
-
-func GetObjectField(object unstructured.Unstructured, fieldname string) (interface{}, error) {
-	if object.Object[fieldname] == nil {
-		return "", fmt.Errorf("No such field: %s", fieldname)
-	}
-	return object.Object[fieldname], nil
-}
-
-
+// Resolve resolves an object and returns an Unstructured
 func Resolve(r client.Client, cfg *rest.Config, object interface{}, composableNamespace string) (unstructured.Unstructured, *ComposableError) {
 	objMap := object.(map[string]interface{})
 	if _, ok := objMap[Metadata]; !ok {
 		err := fmt.Errorf("Failed: Template has no metadata section")
 		logf.Error(err, "", "object", objMap)
-		return unstructured.Unstructured{}, &ComposableError{err, false, false}
+		return unstructured.Unstructured{}, &ComposableError{err, false}
 	}
 	// the underlying object should be created in the same namespace as the Composable object
 	if metadata, ok := objMap[Metadata].(map[string]interface{}); ok {
@@ -89,7 +84,7 @@ func Resolve(r client.Client, cfg *rest.Config, object interface{}, composableNa
 			if composableNamespace != ns {
 				err := fmt.Errorf("Failed: Template defines a wrong namespace %v", ns)
 				logf.Error(err, "", "object", objMap)
-				return unstructured.Unstructured{}, &ComposableError{err, false, false}
+				return unstructured.Unstructured{}, &ComposableError{err, false}
 			}
 
 		} else {
@@ -98,7 +93,7 @@ func Resolve(r client.Client, cfg *rest.Config, object interface{}, composableNa
 	} else {
 		err := fmt.Errorf("Failed: Template has an ill-defined metadata section")
 		logf.Error(err, "", "object", objMap)
-		return unstructured.Unstructured{}, &ComposableError{err, false, false}
+		return unstructured.Unstructured{}, &ComposableError{err, false}
 	}
 
 	cache := &ComposableCache{objects: make(map[string]interface{})}
@@ -130,7 +125,7 @@ func resolveFields(r client.Client, cfg *rest.Config, fields interface{}, compos
 						if len(values) > 1 {
 							err := fmt.Errorf("Failed: Template is ill-formed. GetValueFrom must be the only field in a value")
 							logf.Error(err, "resolveFields", "values", values)
-							return nil, &ComposableError{err, false, false}
+							return nil, &ComposableError{err, false}
 						}
 						newFields, err = resolveValue(r, cfg, value, composableNamespace, cache, discoveryClient)
 					} else {
@@ -205,7 +200,7 @@ func lookupAPIResource(discoveryClient discovery.CachedDiscoveryInterface, objKi
 		list, err := discoveryClient.ServerResourcesForGroupVersion(apiVersion)
 		if err != nil {
 			logf.Error(err, "lookupAPIResource", "apiVersion", apiVersion)
-			return nil, &ComposableError{err, false, true}
+			return nil, &ComposableError{err, true}
 		}
 		resources = []*metav1.APIResourceList{list}
 		//	r.log.V(1).Info("lookupAPIResource", "list", list, "apiVersion", apiVersion)
@@ -213,7 +208,7 @@ func lookupAPIResource(discoveryClient discovery.CachedDiscoveryInterface, objKi
 		resources, err = discoveryClient.ServerPreferredResources()
 		if err != nil {
 			logf.Error(err, "lookupAPIResource ServerPreferredResources")
-			return nil, &ComposableError{err, false, true}
+			return nil, &ComposableError{err, true}
 		}
 	}
 	var targetResource *metav1.APIResource
@@ -225,7 +220,7 @@ Loop:
 		gv, err := schema.ParseGroupVersion(resourceList.GroupVersion)
 		if err != nil {
 			logf.Error(err, "Error parsing GroupVersion", "GroupVersion", resourceList.GroupVersion)
-			return nil, &ComposableError{err, false, true}
+			return nil, &ComposableError{err, true}
 		}
 
 		for _, resource := range resourceList.APIResources {
@@ -252,7 +247,7 @@ Loop:
 	if !coreGroupObject && len(matchedResources) > 1 {
 		err = fmt.Errorf("Multiple resources are matched by %q: %s. A group-qualified plural name must be provided ", kind, strings.Join(matchedResources, ", "))
 		logf.Error(err, "lookupAPIResource")
-		return nil, &ComposableError{err, false, false}
+		return nil, &ComposableError{err, false}
 	}
 
 	if targetResource != nil {
@@ -260,7 +255,7 @@ Loop:
 	}
 	err = fmt.Errorf("Unable to find api resource named %q ", kind)
 	logf.Error(err, "lookupAPIResource")
-	return nil, &ComposableError{err, false, false}
+	return nil, &ComposableError{err, false}
 }
 
 func resolveValue(r client.Client, cfg *rest.Config, value interface{}, composableNamespace string, cache *ComposableCache, discoveryClient discovery.CachedDiscoveryInterface) (interface{}, *ComposableError) {
@@ -289,19 +284,19 @@ func resolveValue(r client.Client, cfg *rest.Config, value interface{}, composab
 				}
 				err = fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is not jsonpath formated ")
 				logf.Error(err, "resolveValue", "path", path)
-				return nil, &ComposableError{err, false, false}
+				return nil, &ComposableError{err, false}
 			}
 			err = fmt.Errorf("Failed: getValueFrom is not well-formed, 'path' is not defined ")
 			logf.Error(err, "resolveValue", "val", val)
-			return nil, &ComposableError{err, false, false}
+			return nil, &ComposableError{err, false}
 		}
 		err = fmt.Errorf("Failed: getValueFrom is not well-formed, 'kind' is not defined ")
 		logf.Error(err, "resolveValue", "val", val)
-		return nil, &ComposableError{err, false, false}
+		return nil, &ComposableError{err, false}
 	}
 	err = fmt.Errorf("Failed: getValueFrom is not well-formed, value type is not %T ", value)
 	logf.Error(err, "resolveValue", "value", value)
-	return nil, &ComposableError{err, false, false}
+	return nil, &ComposableError{err, false}
 }
 
 func getInputObject(r client.Client, val map[string]interface{}, objKind, apiversion, composableNamespace string, cache *ComposableCache, discoveryClient discovery.CachedDiscoveryInterface) (*unstructured.Unstructured, *ComposableError) {
@@ -329,7 +324,7 @@ func getInputObject(r client.Client, val map[string]interface{}, objKind, apiver
 			err = fmt.Errorf("Failed: getValueFrom is not well-formed, neither 'name' nor 'labels' are not defined  ")
 		}
 		logf.Error(err, "getInputObject", "val", val)
-		return nil, &ComposableError{err, false, false}
+		return nil, &ComposableError{err, false}
 	}
 	key := objectKey(name, ns, intLabels, groupVersionKind)
 	if obj, ok := cache.objects[key]; ok {
@@ -343,7 +338,7 @@ func getInputObject(r client.Client, val map[string]interface{}, objKind, apiver
 		default:
 			err = fmt.Errorf("wrong type of cached object %T", obj)
 			logf.Error(err, "")
-			return nil, &ComposableError{err, false, false}
+			return nil, &ComposableError{err, false}
 		}
 	}
 	var unstrObj unstructured.Unstructured
@@ -359,7 +354,7 @@ func getInputObject(r client.Client, val map[string]interface{}, objKind, apiver
 		err := r.Get(context.TODO(), objNamespacedname, &unstrObj)
 		if err != nil {
 			logf.Info("Get object returned ", "err", err, "obj", objNamespacedname)
-			compErr = &ComposableError{err, true, true}
+			compErr = &ComposableError{err, true}
 			cache.objects[key] = toumbstone{err: *compErr}
 			return nil, compErr
 		}
@@ -374,7 +369,7 @@ func getInputObject(r client.Client, val map[string]interface{}, objKind, apiver
 		err = r.List(context.TODO(), &unstrList, client.InNamespace(ns), client.MatchingLabels(strLabels))
 		if err != nil {
 			logf.Info("list object returned ", "err", err, "namespace", ns, "labels", strLabels, "groupVersionKind", groupVersionKind)
-			compErr = &ComposableError{err, true, true}
+			compErr = &ComposableError{err, true}
 			cache.objects[key] = toumbstone{err: *compErr}
 			return nil, compErr
 		}
@@ -385,7 +380,7 @@ func getInputObject(r client.Client, val map[string]interface{}, objKind, apiver
 		} else {
 			err = fmt.Errorf("list object returned %d items ", itms)
 			logf.Error(err, "wrong # of items", "items", itms, "namespace", Namespace, "labels", strLabels, "groupVersionKind", groupVersionKind)
-			compErr = &ComposableError{err, true, true}
+			compErr = &ComposableError{err, true}
 			cache.objects[key] = toumbstone{err: *compErr}
 			return nil, compErr
 		}
@@ -400,7 +395,7 @@ func resolveValue2(val map[string]interface{}, unstrObj unstructured.Unstructure
 	err := j.Parse(path)
 	if err != nil {
 		logf.Error(err, "jsonpath.Parse", "path", path)
-		return nil, &ComposableError{err, false, false}
+		return nil, &ComposableError{err, false}
 	}
 	j.AllowMissingKeys(false)
 
@@ -408,15 +403,15 @@ func resolveValue2(val map[string]interface{}, unstrObj unstructured.Unstructure
 	if err != nil {
 		logf.Error(err, "FindResults", "obj", unstrObj, "path", path)
 		if strings.Contains(err.Error(), "is not found") {
-			return errorToDefaultValue(val, ComposableError{err, true, true})
+			return errorToDefaultValue(val, ComposableError{err, true})
 		}
-		return nil, &ComposableError{err, false, false}
+		return nil, &ComposableError{err, false}
 	}
 	iface, ok := template.PrintableValue(fullResults[0][0])
 	if !ok {
 		err = fmt.Errorf("can't find printable value %v ", fullResults[0][0])
 		logf.Error(err, "template.PrintableValue", "obj", unstrObj, "path", path)
-		return nil, &ComposableError{err, false, false}
+		return nil, &ComposableError{err, false}
 	}
 
 	var retVal interface{}
@@ -447,4 +442,59 @@ func getDiscoveryClient(cfg *rest.Config) discovery.CachedDiscoveryInterface {
 
 func objectKey(name string, namespace string, labels map[string]interface{}, gvk schema.GroupVersionKind) string {
 	return fmt.Sprintf("%s/%s/%v/%s", name, namespace, labels, gvk.String())
+}
+
+// GetValueFromRaw is a helper utility to obtain an interface from Raw
+func GetValueFromRaw(content *runtime.RawExtension) (interface{}, error) {
+	var data interface{}
+
+	if err := json.Unmarshal(content.Raw, &data); err != nil {
+		return nil, err
+	}
+
+	return data, nil
+}
+
+// GetIntValueFromRaw is a helper utility to obtain an Int from Raw
+func GetIntValueFromRaw(content *runtime.RawExtension) (int, error) {
+	var data interface{}
+
+	if err := json.Unmarshal(content.Raw, &data); err != nil {
+		return 0, err
+	}
+
+	return cast.ToInt(data), nil
+}
+
+// GetInt32ValueFromRaw is a helper utility to obtain an Int32 from Raw
+func GetInt32ValueFromRaw(content *runtime.RawExtension) (int32, error) {
+	var data interface{}
+
+	if err := json.Unmarshal(content.Raw, &data); err != nil {
+		return 0, err
+	}
+
+	return cast.ToInt32(data), nil
+}
+
+// GetInt64ValueFromRaw is a helper utility to obtain an Int64 from Raw
+func GetInt64ValueFromRaw(content *runtime.RawExtension) (int64, error) {
+	var data interface{}
+
+	if err := json.Unmarshal(content.Raw, &data); err != nil {
+		return 0, err
+	}
+
+	return cast.ToInt64(data), nil
+}
+
+// GetStringValueFromRaw is a helper utility to obtain an String from Raw
+func GetStringValueFromRaw(content *runtime.RawExtension) (string, error) {
+	var data interface{}
+
+	if err := json.Unmarshal(content.Raw, &data); err != nil {
+		return "", err
+	}
+
+	return cast.ToString(data), nil
 }

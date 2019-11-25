@@ -1,5 +1,6 @@
 package v1
 
+// ComposableCache caches objects that have been read so far in a reconcile cycle
 type ComposableCache struct {
 	objects map[string]interface{}
 }
@@ -8,28 +9,9 @@ type toumbstone struct {
 	err ComposableError
 }
 
+// ComposableError is the error type returned by the composable's Resolve function
 type ComposableError struct {
 	Error error
-	// TODO do we need this state separation
-	IsPendable bool
-	// if the error is retrievable the controller will return it to the manager, and teh last will recall Reconcile again
-	IsRetrievable bool
-}
-
-// +kubebuilder:object:generate=true
-//ComposableGetValueFrom is the struct for Composable getValueFrom
-type ComposableGetValueFrom struct {
-	Kind               string   `json:"kind"`
-	APIVersion         string   `json:"apiVersion,omitempty"`
-	Name               string   `json:"name,omitempty"`
-	Labels             []string `json:"labels,omitempty"`
-	Namespace          string   `json:"namespace,omitempty"`
-	Path               string   `json:"path"`
-	FormatTransformers []string `json:"format-transformers,omitempty"`
-}
-
-// +kubebuilder:object:generate=true
-// GetValueFrom is the type that would appear in a CRD to allow dynamic configuration
-type GetValueFromType struct {
-	GetValueFrom ComposableGetValueFrom `json:"getValueFrom"`
+	// This indicates that the consuming Reconcile function should return this error
+	ShouldBeReturned bool
 }
