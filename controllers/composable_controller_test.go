@@ -420,7 +420,7 @@ var _ = Describe("Find input objects according their labels", func() {
 			comp.Spec.Template.Raw, _ = unstrObj.MarshalJSON()
 			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
-			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(PendingStatus))
+			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(FailedStatus))
 			Ω(test.GetStatusMessage(testContext, &comp)()).Should(ContainSubstring("list object returned 2 items"))
 			test.DeleteInNs(testContext, &comp, false)
 			Eventually(test.GetObject(testContext, &comp)).Should(BeNil())

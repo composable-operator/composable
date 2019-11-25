@@ -21,7 +21,6 @@ import (
 	"strconv"
 	"strings"
 
-	sdk "github.com/ibm/composable/sdk"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -203,7 +202,7 @@ func (r *Composable) findGetValueFrom2(path *field.Path, m []interface{}) field.
 // validateGetValueFrom validates the syntax of input getValueFrom fields
 func validateGetValueFrom(v interface{}) error {
 	var missingItems []string
-	getValueFrom := sdk.ComposableGetValueFrom{}
+	getValueFrom := ComposableGetValueFrom{}
 	message := ""
 	var labelsExist bool = false
 

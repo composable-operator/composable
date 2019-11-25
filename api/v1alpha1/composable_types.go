@@ -42,6 +42,17 @@ type ComposableStatus struct {
 	Message string `json:"message,omitempty"`
 }
 
+//ComposableGetValueFrom
+type ComposableGetValueFrom struct {
+	Kind               string   `json:"kind"`
+	APIVersion         string   `json:"apiVersion,omitempty"`
+	Name               string   `json:"name,omitempty"`
+	Labels             []string `json:"labels,omitempty"`
+	Namespace          string   `json:"namespace,omitempty"`
+	Path               string   `json:"path"`
+	FormatTransformers []string `json:"format-transformers,omitempty"`
+}
+
 // +kubebuilder:object:root=true
 // +kubebuilder:resource:path=composables,scope=Namespaced,shortName=comp
 // +kubebuilder:printcolumn:name="State",type=string,JSONPath=".status.state"
