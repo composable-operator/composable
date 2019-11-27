@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/spf13/cast"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
@@ -442,59 +440,4 @@ func getDiscoveryClient(cfg *rest.Config) discovery.CachedDiscoveryInterface {
 
 func objectKey(name string, namespace string, labels map[string]interface{}, gvk schema.GroupVersionKind) string {
 	return fmt.Sprintf("%s/%s/%v/%s", name, namespace, labels, gvk.String())
-}
-
-// GetValueFromRaw is a helper utility to obtain an interface from Raw
-func GetValueFromRaw(content *runtime.RawExtension) (interface{}, error) {
-	var data interface{}
-
-	if err := json.Unmarshal(content.Raw, &data); err != nil {
-		return nil, err
-	}
-
-	return data, nil
-}
-
-// GetIntValueFromRaw is a helper utility to obtain an Int from Raw
-func GetIntValueFromRaw(content *runtime.RawExtension) (int, error) {
-	var data interface{}
-
-	if err := json.Unmarshal(content.Raw, &data); err != nil {
-		return 0, err
-	}
-
-	return cast.ToInt(data), nil
-}
-
-// GetInt32ValueFromRaw is a helper utility to obtain an Int32 from Raw
-func GetInt32ValueFromRaw(content *runtime.RawExtension) (int32, error) {
-	var data interface{}
-
-	if err := json.Unmarshal(content.Raw, &data); err != nil {
-		return 0, err
-	}
-
-	return cast.ToInt32(data), nil
-}
-
-// GetInt64ValueFromRaw is a helper utility to obtain an Int64 from Raw
-func GetInt64ValueFromRaw(content *runtime.RawExtension) (int64, error) {
-	var data interface{}
-
-	if err := json.Unmarshal(content.Raw, &data); err != nil {
-		return 0, err
-	}
-
-	return cast.ToInt64(data), nil
-}
-
-// GetStringValueFromRaw is a helper utility to obtain an String from Raw
-func GetStringValueFromRaw(content *runtime.RawExtension) (string, error) {
-	var data interface{}
-
-	if err := json.Unmarshal(content.Raw, &data); err != nil {
-		return "", err
-	}
-
-	return cast.ToString(data), nil
 }

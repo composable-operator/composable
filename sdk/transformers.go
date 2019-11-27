@@ -33,6 +33,9 @@ const (
 	// StringToInt - name of the string to integer transformer
 	StringToInt = "StringToInt"
 
+	// StringToInt32 - name of the string to integer32 transformer
+	StringToInt32 = "StringToInt32"
+
 	// StringToFloat - name of the string to float transformer
 	StringToFloat = "StringToFloat"
 
@@ -94,6 +97,8 @@ func string2Transformer(transformerName string) (Transformer, error) {
 		return String2Base64Transformer, nil
 	case StringToInt:
 		return String2IntTransformer, nil
+	case StringToInt32:
+		return String2Int32Transformer, nil
 	case StringToFloat:
 		return String2FloatTransformer, nil
 	case StringToBool:
@@ -179,6 +184,18 @@ func ToStringTransformer(value interface{}) (interface{}, error) {
 func String2IntTransformer(value interface{}) (interface{}, error) {
 	if strValue, ok := value.(string); ok {
 		n, err := strconv.Atoi(strValue)
+		if err == nil {
+			return n, nil
+		}
+		return nil, err
+	}
+	return nil, fmt.Errorf("The given %v has type %T, and it is not a string", value, value)
+}
+
+// String2Int32Transformer ...
+func String2Int32Transformer(value interface{}) (interface{}, error) {
+	if strValue, ok := value.(string); ok {
+		n, err := strconv.ParseInt(strValue, 10, 32)
 		if err == nil {
 			return n, nil
 		}
