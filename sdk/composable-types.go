@@ -15,3 +15,21 @@ type ComposableError struct {
 	// This indicates that the consuming Reconcile function should return this error
 	ShouldBeReturned bool
 }
+
+// ComposableGetValueFrom specifies a reference to a Kubernetes object
+// +kubebuilder:object:generate=true
+type ComposableGetValueFrom struct {
+	Kind               string   `json:"kind"`
+	APIVersion         string   `json:"apiVersion,omitempty"`
+	Name               string   `json:"name,omitempty"`
+	Labels             []string `json:"labels,omitempty"`
+	Namespace          string   `json:"namespace,omitempty"`
+	Path               string   `json:"path"`
+	FormatTransformers []string `json:"format-transformers,omitempty"`
+}
+
+// ObjectRef is the type that can be used for cross-resource references
+// +kubebuilder:object:generate=true
+type ObjectRef struct {
+	GetValueFrom ComposableGetValueFrom `json:"getValueFrom"`
+}

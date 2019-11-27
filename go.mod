@@ -34,3 +34,5 @@ replace sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.2.0
 replace k8s.io/api => k8s.io/api v0.0.0-20190409021203-6e4e0e4f393b
 
 replace k8s.io/apimachinery => k8s.io/apimachinery v0.0.0-20190404173353-6a84e37a896d
+
+replace github.com/ibm/composable/sdk => ./sdk
