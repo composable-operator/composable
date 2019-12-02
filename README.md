@@ -22,6 +22,12 @@
 *Note:* The project uses Golang modules, in order to  activate module support, please set the the `GO111MODULE` 
 environment variable to `on`. [How to Install and Activate Module Support](https://github.com/golang/go/wiki/Modules#how-to-install-and-activate-module-support)
  
+
+This project also contains the [Composable SDK](./sdk/README.md), a library that allows users to add 
+cross-resource references to their own CRD and enable dynamic configuration. 
+For more information and a tutorial see [here](./sdk/docs/tutorial.md).
+
+
 # Composable Operator
 
 Kubernetes object specifications often require constant values for their fields. When deploying an entire application
