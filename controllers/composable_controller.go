@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"reflect"
 	"time"
 
@@ -137,18 +138,23 @@ func (r *composableReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 			}
 		}
 	}()
+
+	// Validate the embedded template if Composable's admission control webhook is not running
+	if os.Getenv("ADMISSION_CONTROL") != "true" {
+		err := validateComposable(compInstance)
+		if err != nil {
+			status.State = FailedStatus
+			status.Message = "Request is malformed and failed validation. " + err.Error()
+			return ctrl.Result{}, nil
+		}
+	}
+
 	// If Status is not set, set it to Pending
 	if reflect.DeepEqual(compInstance.Status, ibmcloudv1alpha1.ComposableStatus{}) {
 		status.State = PendingStatus
 		status.Message = "Creating resource"
 	}
-	if compInstance.Spec.Template == nil {
-		err := fmt.Errorf("The object's spec doesn't contain `Template`")
-		r.log.Error(err, "object", req)
-		status.State = FailedStatus
-		status.Message = err.Error()
-		return ctrl.Result{}, nil
-	}
+
 	object, err := r.toJSONFromRaw(compInstance.Spec.Template)
 	if err != nil {
 		// we don't print the error, it was done in toJSONFromRaw
