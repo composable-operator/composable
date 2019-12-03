@@ -12,6 +12,13 @@ resolved after it has been deployed.
 
 See this [tutorial](./docs/tutorial.md), in which we add cross-references to the `memcached-operator` (provided as a sample for `operator-sdk`) using the Composable SDK.
 
+## Installation
+
+To install, run:
+```
+go get github.com/ibm/composable/sdk
+```
+
 ## Types
 
 The Composable SDK offers the following types.
