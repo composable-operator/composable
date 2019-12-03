@@ -10,7 +10,7 @@ require (
 	github.com/go-logr/zapr v0.1.1
 	github.com/gogo/protobuf v1.2.1 // indirect
 	github.com/gophercloud/gophercloud v0.6.0 // indirect
-	github.com/ibm/composable/sdk v0.1.2
+	github.com/ibm/composable/sdk v0.1.3
 	github.com/json-iterator/go v1.1.6 // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/onsi/ginkgo v1.8.0
