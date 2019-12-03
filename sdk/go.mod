@@ -7,9 +7,9 @@ require (
 	github.com/onsi/gomega v1.4.2
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45 // indirect
 	google.golang.org/appengine v1.5.0 // indirect
-	k8s.io/apimachinery v0.0.0-20191111054156-6eb29fdf75dc
+	k8s.io/apimachinery v0.0.0-20190404173353-6a84e37a896d
 	k8s.io/client-go v11.0.1-0.20190409021438-1a26190bd76a+incompatible
-	sigs.k8s.io/controller-runtime v0.3.0
+	sigs.k8s.io/controller-runtime v0.2.0
 )
 
 replace (
