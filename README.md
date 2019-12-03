@@ -9,7 +9,7 @@
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
 
-- [Composable Operator](#composable-operator)
+- [Introduction](#introduction)
   - [Installing Composable](#installing-composable)
   - [Removing Composable](#removing-composable)
   - [Examples](#examples)
