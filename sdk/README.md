@@ -1,7 +1,7 @@
 # Composable SDK
 
 [![Build Status](https://travis-ci.com/IBM/composable.svg?branch=master)](https://travis-ci.com/IBM/composable)
-[![Go Report Card](https://goreportcard.com/badge/github.com/IBM/composable/)](https://goreportcard.com/report/github.com/IBM/composable)
+[![Go Report Card](https://goreportcard.com/badge/github.com/IBM/composable)](https://goreportcard.com/report/github.com/IBM/composable)
 [![GoDoc](https://godoc.org/github.com/IBM/composable/sdk?status.svg)](https://godoc.org/github.com/IBM/composable/sdk)
 
 Kubernetes object specifications often require constant values for their fields. When deploying an entire application
