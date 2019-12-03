@@ -1,3 +1,10 @@
+# Composable Operator
+
+[![Build Status](https://travis-ci.com/IBM/composable.svg?branch=master)](https://travis-ci.com/IBM/composable)
+[![Go Report Card](https://goreportcard.com/badge/github.com/IBM/composable)](https://goreportcard.com/report/github.com/IBM/composable)
+[![GoDoc](https://godoc.org/github.com/IBM/composable?status.svg)](https://godoc.org/github.com/IBM/composable)
+
+
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
 **Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
@@ -27,8 +34,7 @@ This project also contains the [Composable SDK](./sdk/README.md), a library that
 cross-resource references to their own CRD and enable dynamic configuration. 
 For more information and a tutorial see [here](./sdk/docs/tutorial.md).
 
-
-# Composable Operator
+## Introduction
 
 Kubernetes object specifications often require constant values for their fields. When deploying an entire application
 with many different resources, this limitation often results in the need for staged deployments, because some resources
