@@ -48,7 +48,7 @@ For a detailed explanation of how to specify an object reference according to th
 
 ## Functions
 
-The Copomsable SDK offers the following function for resolving the value of cross-resource references.
+The Composable SDK offers the following function for resolving the value of cross-resource references.
 
 ```golang
 func ResolveObject(r client.Client, config *rest.Config, object interface{}, resolved interface{}, composableNamespace string) *ComposableError 
