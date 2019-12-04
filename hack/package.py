@@ -73,6 +73,7 @@ os.chdir(script_home)
 config = os.path.join(script_home,"..","config")
 releases=os.path.join(script_home,"..","releases",args.version)
 olm=os.path.join(script_home,"..","olm",args.version)
+channel=os.path.join(script_home,"..","olm")
 latest=os.path.join(script_home,"..","releases","latest")
 
 # load defaults 
@@ -164,7 +165,7 @@ with open(os.path.join(config,"templates","template.package.yaml"), 'r') as stre
     pkg['channels'][0]['name'] = defs['channel_name']
     pkg['packageName'] = defs['operator_name']
 
-    with open(os.path.join(olm,"composable_operator.package.yaml"), "w") as outfile:
+    with open(os.path.join(channel,"composable_operator.package.yaml"), "w") as outfile:
         yaml.dump(pkg, outfile, default_flow_style=False)
  
 # fill in cluster service version from template, deployment and roles
