@@ -25,7 +25,7 @@ go get github.com/ibm/composable/sdk
 
 ## Types
 
-The Composable SDK offers the following types:
+The Composable SDK offers the following types.
 
 ```golang
 type ObjectRef struct {
