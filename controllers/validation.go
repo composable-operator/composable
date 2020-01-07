@@ -41,7 +41,7 @@ func validateComposable(comp *composablev1alpha1.Composable) error {
 	validatelog.Info("Enter validation", "resourcename", comp.Name)
 	if comp.Spec.Template == nil {
 		err := fmt.Errorf("Missing spec.template")
-		validatelog.Info("Leave validation", "error", err)
+		validatelog.Info("Finish validation", "error", err)
 		return err
 	}
 	allErrs := validateAPIVersionKind(comp.Name, comp.Spec.Template, field.NewPath("spec").Child("template"))
@@ -50,11 +50,11 @@ func validateComposable(comp *composablev1alpha1.Composable) error {
 		allErrs = append(allErrs, err...)
 	}
 	if len(allErrs) > 0 {
-		validatelog.Info("Leave validation", "errors", allErrs)
+		validatelog.Info("Finish validation", "errors", allErrs)
 		return apierrors.NewInvalid(schema.GroupKind{Group: "ibmcloud.ibm.com", Kind: "Composable"}, comp.Name, allErrs)
 	}
 
-	validatelog.Info("Leave validation", "errors", allErrs)
+	validatelog.Info("Finish validation with no errors")
 	return nil
 }
 
@@ -176,6 +176,43 @@ func validateGetValueFrom(v interface{}, key *field.Path) field.ErrorList {
 	}
 	if len(getValueFrom.Path) == 0 {
 		allErrs = append(allErrs, field.Required(key.Child("path"), "missing required field \"path\""))
+	}
+	//validatelog.Info("validateGetValueFrom", "transformers size", len(getValueFrom.FormatTransformers))
+	if len(getValueFrom.FormatTransformers) > 0 {
+		errs := validateTransformers(getValueFrom.FormatTransformers, key.Child("format-transformers"))
+		if errs != nil {
+			allErrs = append(allErrs, errs...)
+		}
+	}
+	return allErrs
+}
+
+func validateTransformers(names []string, key *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	var isValid bool
+	transformers := [10]string{sdk.Base64ToString,
+		sdk.StringToBase64,
+		sdk.StringToInt,
+		sdk.StringToInt32,
+		sdk.StringToFloat,
+		sdk.ArrayToCSString,
+		sdk.StringToBool,
+		sdk.ToString,
+		sdk.JSONToObject,
+		sdk.ObjectToJSON,
+	}
+
+	for j := 0; j < len(names); j++ {
+		isValid = false
+		for i := 0; i < len(transformers); i++ {
+			if names[j] == transformers[i] {
+				isValid = true
+				break
+			}
+		}
+		if !isValid {
+			allErrs = append(allErrs, field.Invalid(key, names[j], "unknown format-transformer"))
+		}
 	}
 	return allErrs
 }
