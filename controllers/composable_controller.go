@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/rest"
+	discovery "k8s.io/client-go/discovery"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -62,10 +62,10 @@ const (
 // ComposableReconciler reconciles a Composable object
 type composableReconciler struct {
 	client.Client
-	log        logr.Logger
-	config     *rest.Config
-	scheme     *runtime.Scheme
-	controller controller.Controller
+	log             logr.Logger
+	scheme          *runtime.Scheme
+	controller      controller.Controller
+	discoveryClient discovery.ServerResourcesInterface
 }
 
 // ManagerSettableReconciler - a Reconciler that can be added to a Manager
@@ -80,10 +80,10 @@ var _ ManagerSettableReconciler = &composableReconciler{}
 func NewReconciler(mgr ctrl.Manager) ManagerSettableReconciler {
 	cfg := mgr.GetConfig()
 	return &composableReconciler{
-		Client: mgr.GetClient(),
-		log:    ctrl.Log.WithName("controllers").WithName("Composable"),
-		scheme: mgr.GetScheme(),
-		config: cfg,
+		Client:          mgr.GetClient(),
+		log:             ctrl.Log.WithName("controllers").WithName("Composable"),
+		scheme:          mgr.GetScheme(),
+		discoveryClient: discovery.NewDiscoveryClientForConfigOrDie(cfg),
 	}
 }
 
@@ -164,7 +164,7 @@ func (r *composableReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 		return ctrl.Result{}, nil
 	}
 
-	resource, compError := sdk.Resolve(r.Client, r.config, object, compInstance.Namespace)
+	resource, compError := sdk.Resolve(context.TODO(), r.Client, r.discoveryClient, object, compInstance.Namespace)
 
 	if compError != nil {
 		status.Message = compError.Error.Error()
@@ -192,7 +192,7 @@ func (r *composableReconciler) createUnderlyingObject(resource unstructured.Unst
 	}
 	r.log.V(1).Info("Resource name is: "+name, "comName", compInstance.Name)
 
-	namespace, err := getNamespace(resource.Object)
+	namespace, err := sdk.GetNamespace(resource.Object)
 	if err != nil {
 		status.State = FailedStatus
 		status.Message = err.Error()
@@ -310,14 +310,6 @@ func getName(obj map[string]interface{}) (string, error) {
 		return name.(string), nil
 	}
 	return "", fmt.Errorf("Failed: Template does not contain name")
-}
-
-func getNamespace(obj map[string]interface{}) (string, error) {
-	metadata := obj[sdk.Metadata].(map[string]interface{})
-	if namespace, ok := metadata[sdk.Namespace]; ok {
-		return namespace.(string), nil
-	}
-	return "", fmt.Errorf("Failed: Template does not contain namespace")
 }
 
 func getState(obj map[string]interface{}) (string, error) {

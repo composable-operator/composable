@@ -1,5 +1,9 @@
 package v1
 
+import (
+	"context"
+)
+
 // ComposableCache caches objects that have been read so far in a reconcile cycle
 type ComposableCache struct {
 	objects map[string]interface{}
@@ -14,6 +18,12 @@ type ComposableError struct {
 	Error error
 	// This indicates that the consuming Reconcile function should return this error
 	ShouldBeReturned bool
+}
+
+// ResolveObject interface
+type ResolveObject interface {
+	// ResolveObject resolves object references. It uses a context for cancellation.
+	ResolveObject(ctx context.Context, in, out interface{}) error
 }
 
 // ComposableGetValueFrom specifies a reference to a Kubernetes object

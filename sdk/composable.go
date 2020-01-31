@@ -22,6 +22,7 @@ import (
 
 var logf = log.Log.WithName("composable-sdk")
 
+// String constants
 const (
 	Metadata     = "metadata"
 	Namespace    = "namespace"
@@ -36,40 +37,50 @@ const (
 	objectPrefix = ".Object"
 )
 
+// KubernetesResourceResolver implements the ResolveObject interface
+type KubernetesResourceResolver struct {
+	Client          client.Client
+	ResourcesClient discovery.ServerResourcesInterface
+}
+
 // ResolveObject resolves the object into resolved
-func ResolveObject(r client.Client, config *rest.Config, object interface{}, resolved interface{}, composableNamespace string) *ComposableError {
+func (k KubernetesResourceResolver) ResolveObject(ctx context.Context, object interface{}, resolved interface{}) error {
 	var objectMap map[string]interface{}
 	inrec, err := json.Marshal(object)
 	if err != nil {
-		return &ComposableError{err, false}
+		return err
 	}
 
 	err = json.Unmarshal(inrec, &objectMap)
 	if err != nil {
-		return &ComposableError{err, false}
+		return err
 	}
 
-	unstructured, comperr := Resolve(r, config, objectMap, composableNamespace)
+	namespace, err := GetNamespace(objectMap)
+	if err != nil {
+		return err
+	}
+
+	unstructured, comperr := Resolve(ctx, k.Client, k.ResourcesClient, objectMap, namespace)
 	if comperr != nil {
-		return comperr
+		return comperr.Error
 	}
 
 	inrec, err = json.Marshal(unstructured.Object)
 	if err != nil {
-		return &ComposableError{err, false}
+		return err
 	}
 
 	err = json.Unmarshal(inrec, &resolved)
 	if err != nil {
-		return &ComposableError{err, false}
+		return err
 	}
 
-	logf.Info("!!!!", "resolved", resolved)
 	return nil
 }
 
 // Resolve resolves an object and returns an Unstructured
-func Resolve(r client.Client, cfg *rest.Config, object interface{}, composableNamespace string) (unstructured.Unstructured, *ComposableError) {
+func Resolve(ctx context.Context, r client.Client, discoveryClient discovery.ServerResourcesInterface, object interface{}, composableNamespace string) (unstructured.Unstructured, *ComposableError) {
 	objMap := object.(map[string]interface{})
 	if _, ok := objMap[Metadata]; !ok {
 		err := fmt.Errorf("Failed: Template has no metadata section")
@@ -95,8 +106,7 @@ func Resolve(r client.Client, cfg *rest.Config, object interface{}, composableNa
 	}
 
 	cache := &ComposableCache{objects: make(map[string]interface{})}
-	discoveryClient := getDiscoveryClient(cfg)
-	obj, err := resolveFields(r, cfg, object.(map[string]interface{}), composableNamespace, cache, discoveryClient)
+	obj, err := resolveFields(r, object.(map[string]interface{}), composableNamespace, cache, discoveryClient)
 	if err != nil {
 		return unstructured.Unstructured{}, err
 	}
@@ -104,7 +114,7 @@ func Resolve(r client.Client, cfg *rest.Config, object interface{}, composableNa
 	return ret, nil
 }
 
-func resolveFields(r client.Client, cfg *rest.Config, fields interface{}, composableNamespace string, cache *ComposableCache, discoveryClient discovery.CachedDiscoveryInterface) (interface{}, *ComposableError) {
+func resolveFields(r client.Client, fields interface{}, composableNamespace string, cache *ComposableCache, discoveryClient discovery.ServerResourcesInterface) (interface{}, *ComposableError) {
 	switch fields.(type) {
 	case map[string]interface{}:
 		if fieldsOut, ok := fields.(map[string]interface{}); ok {
@@ -112,7 +122,7 @@ func resolveFields(r client.Client, cfg *rest.Config, fields interface{}, compos
 				var newFields interface{}
 				var err *ComposableError
 				if k == GetValueFrom {
-					newFields, err = resolveValue(r, cfg, v, composableNamespace, cache, discoveryClient)
+					newFields, err = resolveValue(r, v, composableNamespace, cache, discoveryClient)
 					if err != nil {
 						logf.Info("resolveFields resolveValue 1", "err", err)
 						return nil, err
@@ -125,9 +135,9 @@ func resolveFields(r client.Client, cfg *rest.Config, fields interface{}, compos
 							logf.Error(err, "resolveFields", "values", values)
 							return nil, &ComposableError{err, false}
 						}
-						newFields, err = resolveValue(r, cfg, value, composableNamespace, cache, discoveryClient)
+						newFields, err = resolveValue(r, value, composableNamespace, cache, discoveryClient)
 					} else {
-						newFields, err = resolveFields(r, cfg, values, composableNamespace, cache, discoveryClient)
+						newFields, err = resolveFields(r, values, composableNamespace, cache, discoveryClient)
 					}
 					if err != nil {
 						logf.Info("resolveFields resolveValue 2", "err", err)
@@ -136,7 +146,7 @@ func resolveFields(r client.Client, cfg *rest.Config, fields interface{}, compos
 					fieldsOut[k] = newFields
 				} else if values, ok := v.([]interface{}); ok {
 					for i, value := range values {
-						newFields, err := resolveFields(r, cfg, value, composableNamespace, cache, discoveryClient)
+						newFields, err := resolveFields(r, value, composableNamespace, cache, discoveryClient)
 						if err != nil {
 							return nil, err
 						}
@@ -149,7 +159,7 @@ func resolveFields(r client.Client, cfg *rest.Config, fields interface{}, compos
 	case []map[string]interface{}, [][]interface{}:
 		if values, ok := fields.([]interface{}); ok {
 			for i, value := range values {
-				newFields, err := resolveFields(r, cfg, value, composableNamespace, cache, discoveryClient)
+				newFields, err := resolveFields(r, value, composableNamespace, cache, discoveryClient)
 				if err != nil {
 					return nil, err
 				}
@@ -190,7 +200,7 @@ func groupQualifiedName(name, group string) string {
 	return fmt.Sprintf("%s.%s", name, group)
 }
 
-func lookupAPIResource(discoveryClient discovery.CachedDiscoveryInterface, objKind, apiVersion string) (*metav1.APIResource, *ComposableError) {
+func lookupAPIResource(discoveryClient discovery.ServerResourcesInterface, objKind, apiVersion string) (*metav1.APIResource, *ComposableError) {
 	//r.log.V(1).Info("lookupAPIResource", "objKind", objKind, "apiVersion", apiVersion)
 	var resources []*metav1.APIResourceList
 	var err error
@@ -256,7 +266,7 @@ Loop:
 	return nil, &ComposableError{err, false}
 }
 
-func resolveValue(r client.Client, cfg *rest.Config, value interface{}, composableNamespace string, cache *ComposableCache, discoveryClient discovery.CachedDiscoveryInterface) (interface{}, *ComposableError) {
+func resolveValue(r client.Client, value interface{}, composableNamespace string, cache *ComposableCache, discoveryClient discovery.ServerResourcesInterface) (interface{}, *ComposableError) {
 	//r.log.Info("resolveValue", "value", value)
 	var err error
 	if val, ok := value.(map[string]interface{}); ok {
@@ -297,7 +307,7 @@ func resolveValue(r client.Client, cfg *rest.Config, value interface{}, composab
 	return nil, &ComposableError{err, false}
 }
 
-func getInputObject(r client.Client, val map[string]interface{}, objKind, apiversion, composableNamespace string, cache *ComposableCache, discoveryClient discovery.CachedDiscoveryInterface) (*unstructured.Unstructured, *ComposableError) {
+func getInputObject(r client.Client, val map[string]interface{}, objKind, apiversion, composableNamespace string, cache *ComposableCache, discoveryClient discovery.ServerResourcesInterface) (*unstructured.Unstructured, *ComposableError) {
 	res, compErr := lookupAPIResource(discoveryClient, objKind, apiversion)
 	if compErr != nil {
 		// We cannot resolve input object API resource, so we return error even if a default value is set.
@@ -440,4 +450,13 @@ func getDiscoveryClient(cfg *rest.Config) discovery.CachedDiscoveryInterface {
 
 func objectKey(name string, namespace string, labels map[string]interface{}, gvk schema.GroupVersionKind) string {
 	return fmt.Sprintf("%s/%s/%v/%s", name, namespace, labels, gvk.String())
+}
+
+// GetNamespace gets the namespace out of a map
+func GetNamespace(obj map[string]interface{}) (string, error) {
+	metadata := obj[Metadata].(map[string]interface{})
+	if namespace, ok := metadata[Namespace]; ok {
+		return namespace.(string), nil
+	}
+	return "", fmt.Errorf("Failed: Template does not contain namespace")
 }
