@@ -66,17 +66,12 @@ spec:
               type: string
             state:
               description: State shows the composable object state
-              enum:
-              - Failed
-              - Pending
-              - Online
               type: string
           type: object
       required:
       - metadata
       - spec
       type: object
-  version: v1alpha1
   versions:
   - name: v1alpha1
     served: true

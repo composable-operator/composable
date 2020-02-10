@@ -62,10 +62,10 @@ const (
 // ComposableReconciler reconciles a Composable object
 type composableReconciler struct {
 	client.Client
-	log             logr.Logger
-	scheme          *runtime.Scheme
-	controller      controller.Controller
-	discoveryClient discovery.ServerResourcesInterface
+	log        logr.Logger
+	scheme     *runtime.Scheme
+	controller controller.Controller
+	resolver   sdk.KubernetesResourceResolver
 }
 
 // ManagerSettableReconciler - a Reconciler that can be added to a Manager
@@ -80,10 +80,13 @@ var _ ManagerSettableReconciler = &composableReconciler{}
 func NewReconciler(mgr ctrl.Manager) ManagerSettableReconciler {
 	cfg := mgr.GetConfig()
 	return &composableReconciler{
-		Client:          mgr.GetClient(),
-		log:             ctrl.Log.WithName("controllers").WithName("Composable"),
-		scheme:          mgr.GetScheme(),
-		discoveryClient: discovery.NewDiscoveryClientForConfigOrDie(cfg),
+		Client: mgr.GetClient(),
+		log:    ctrl.Log.WithName("controllers").WithName("Composable"),
+		scheme: mgr.GetScheme(),
+		resolver: sdk.KubernetesResourceResolver{
+			Client:          mgr.GetClient(),
+			ResourcesClient: discovery.NewDiscoveryClientForConfigOrDie(cfg),
+		},
 	}
 }
 
@@ -164,20 +167,51 @@ func (r *composableReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) 
 		return ctrl.Result{}, nil
 	}
 
-	resource, compError := sdk.Resolve(context.TODO(), r.Client, r.discoveryClient, object, compInstance.Namespace)
+	updated, err := r.updateObjectNamespace(object, compInstance.Namespace)
 
-	if compError != nil {
-		status.Message = compError.Error.Error()
+	resource := &unstructured.Unstructured{}
+	resource.Object = make(map[string]interface{})
+
+	err = r.resolver.ResolveObject(context.TODO(), updated, &resource.Object)
+
+	if err != nil {
+		status.Message = err.Error()
 		status.State = FailedStatus
-		if compError.ShouldBeReturned {
-			return ctrl.Result{}, compError.Error
+		if sdk.IsRefNotFound(err) {
+			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
 
 	}
 	// if createUnderlyingObject faces with errors, it will update the state
 	status.State = OnlineStatus
-	return ctrl.Result{}, r.createUnderlyingObject(resource, compInstance, &status)
+	return ctrl.Result{}, r.createUnderlyingObject(*resource, compInstance, &status)
+}
+
+func (r *composableReconciler) updateObjectNamespace(object interface{}, composableNamespace string) (interface{}, error) {
+	objMap := object.(map[string]interface{})
+	if _, ok := objMap[sdk.Metadata]; !ok {
+		err := fmt.Errorf("Failed: Template has no metadata section")
+		return object, err
+	}
+	// the underlying object should be created in the same namespace as the Composable object
+	if metadata, ok := objMap[sdk.Metadata].(map[string]interface{}); ok {
+		if ns, ok := metadata[sdk.Namespace]; ok {
+			if composableNamespace != ns {
+				err := fmt.Errorf("Failed: Template defines a wrong namespace %v", ns)
+				return object, err
+			}
+
+		} else {
+			objMap[sdk.Metadata].(map[string]interface{})[sdk.Namespace] = composableNamespace
+			r.log.V(1).Info("objMap: ", "is", objMap)
+			return objMap, nil
+		}
+	} else {
+		err := fmt.Errorf("Failed: Template has an ill-defined metadata section")
+		return object, err
+	}
+	return object, nil
 }
 
 func (r *composableReconciler) createUnderlyingObject(resource unstructured.Unstructured,
