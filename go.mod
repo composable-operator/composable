@@ -1,6 +1,6 @@
 module github.com/ibm/composable
 
-go 1.12
+go 1.13
 
 require (
 	github.com/Azure/go-autorest/autorest v0.9.2 // indirect
@@ -10,7 +10,7 @@ require (
 	github.com/go-logr/zapr v0.1.1
 	github.com/gogo/protobuf v1.2.1 // indirect
 	github.com/gophercloud/gophercloud v0.6.0 // indirect
-	github.com/ibm/composable/sdk v0.1.3
+	github.com/ibm/composable/sdk v0.1.4
 	github.com/json-iterator/go v1.1.6 // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/onsi/ginkgo v1.8.0

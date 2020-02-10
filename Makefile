@@ -75,6 +75,11 @@ docker-push: docker-build
 release: check-tag
 	python hack/package.py v${TAG}
 
+# make an initial release for olm and releases
+release-update: check-tag
+	python hack/package.py v${TAG} --is_update
+
+
 # find or download controller-gen
 # download controller-gen if necessary
 controller-gen:
