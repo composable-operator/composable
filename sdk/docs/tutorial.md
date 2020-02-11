@@ -115,18 +115,26 @@ First, we need to modify the `ReconcileMemcached` type to include a Kubernetes c
 ```golang
 // ReconcileMemcached reconciles a Memcached object
 type ReconcileMemcached struct {
-	client client.Client
-	scheme *runtime.Scheme
-	config *rest.Config
+	client   client.Client
+	scheme   *runtime.Scheme
+	resolver sdk.ResolveObject
 }
 ```
 
-And we modify the creation of the reconciler accordingly:
+The `ReconcileMemcached` struct now has a field `resolver`, which implements the interface `ResolveObject` that offers a method for resolving
+cross-resource references.
+We modify the creation of the reconciler accordingly:
 
 ```golang
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMemcached{client: mgr.GetClient(), scheme: mgr.GetScheme(), config: mgr.GetConfig()}
+	cfg := mgr.GetConfig()
+	return &ReconcileMemcached{client: mgr.GetClient(), scheme: mgr.GetScheme(),
+		resolver: sdk.KubernetesResourceResolver{
+			Client:          mgr.GetClient(),
+			ResourcesClient: discovery.NewDiscoveryClientForConfigOrDie(cfg),
+		},
+	}
 }
 ```
 
@@ -146,12 +154,12 @@ func (r *ReconcileMemcached) Reconcile(request reconcile.Request) (reconcile.Res
 
 	// Resolve the memcached instance
 	resolved := &cachev1alpha1.MemcachedResolved{}
-	comperr := sdk.ResolveObject(r.client, r.config, memcached, resolved, request.Namespace)
-	if comperr != nil {
-		if comperr.ShouldBeReturned {
-			return reconcile.Result{}, comperr.Error
+	err = r.resolver.ResolveObject(context.TODO(), memcached, resolved)
+	// Fix this to have more info on the nature of the error
+	if err != nil {
+		if sdk.IsRefNotFound(err) {
+			return reconcile.Result{}, err
 		}
-		reqLogger.Info("Error during resolve, but not returned", comperr.Error)
 		return reconcile.Result{}, nil
 	}
 
@@ -167,24 +175,13 @@ func (r *ReconcileMemcached) Reconcile(request reconcile.Request) (reconcile.Res
 
 ```
 
-The `sdk.ResolveObject` method takes a Kubernetes client and config, an object to resolve (in this example `memcached`),
-an empty object with the right type to cast and return the resolved object (in this example `resolved`), and a 
-default namespace. This namespace is used to look up object references that do not specify a namespace.
+The `ResolveObject` function takes a context, an object to resolve (in this example `memcached`), and
+an empty object with the right type to return the resolved object (in this example `resolved`).
 In this example, `resolved` is of type `MemcachedResolved` as specified above. 
 
-The function `sdk.ResolveObject` returns a `ComposableError`:
-
-```golang
-type ComposableError struct {
-	Error error
-	// This indicates that the consuming Reconcile function should return this error
-	ShouldBeReturned bool
-}
-```
-
-The type `ComposableError` contains the error, if any, and a boolean `ShouldBeReturned` to indicate whether the calling reconciler
-should return this error or not. This is used to distinguish errors that are minor and could be fixed by immediately retrying
-from errors that may indicate a stronger failure, such as an ill-formed yaml (in which case there is no need to retry right away).
+The function `sdk.ResolveObject` returns an error and the Composable SDK offers a variety of functions to determine the nature of the error.
+This helps to determine whether the calling reconciler should return this error or not. This is used to distinguish errors that are minor and could be fixed by immediately retrying from errors that may indicate a stronger failure, such as an ill-formed yaml (in which case there is no need to retry right away).
+In this case, if the reference is not found, we return the error to retry. Otherwise, we do not return the error.
 
 Notice that the signature of the `deploymentForMemcached` function has changed and that it takes a `MemcachedResolved` object now.
 Also when the size needed in the code (not shown here), it must be obtained from `resolved` instead of `memcached`.
