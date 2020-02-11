@@ -65,7 +65,7 @@ type composableReconciler struct {
 	log        logr.Logger
 	scheme     *runtime.Scheme
 	controller controller.Controller
-	resolver   sdk.KubernetesResourceResolver
+	resolver   sdk.ResolveObject
 }
 
 // ManagerSettableReconciler - a Reconciler that can be added to a Manager

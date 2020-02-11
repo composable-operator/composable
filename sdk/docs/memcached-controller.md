@@ -14,7 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/rest"
+	discovery "k8s.io/client-go/discovery"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -35,7 +35,13 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileMemcached{client: mgr.GetClient(), scheme: mgr.GetScheme(), config: mgr.GetConfig()}
+	cfg := mgr.GetConfig()
+	return &ReconcileMemcached{client: mgr.GetClient(), scheme: mgr.GetScheme(),
+		resolver: sdk.KubernetesResourceResolver{
+			Client:          mgr.GetClient(),
+			ResourcesClient: discovery.NewDiscoveryClientForConfigOrDie(cfg),
+		},
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -80,9 +86,9 @@ type ReconcileMemcached struct {
 	// TODO: Clarify the split client
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
-	client client.Client
-	scheme *runtime.Scheme
-	config *rest.Config
+	client   client.Client
+	scheme   *runtime.Scheme
+	resolver sdk.ResolveObject
 }
 
 // Reconcile reads that state of the cluster for a Memcached object and makes changes based on the state read
@@ -95,7 +101,6 @@ type ReconcileMemcached struct {
 func (r *ReconcileMemcached) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling Memcached.")
-
 	// Fetch the Memcached instance
 	memcached := &cachev1alpha1.Memcached{}
 	err := r.client.Get(context.TODO(), request.NamespacedName, memcached)
@@ -114,12 +119,12 @@ func (r *ReconcileMemcached) Reconcile(request reconcile.Request) (reconcile.Res
 
 	// Resolve the memcached instance
 	resolved := &cachev1alpha1.MemcachedResolved{}
-	comperr := sdk.ResolveObject(r.client, r.config, memcached, resolved, request.Namespace)
-	if comperr != nil {
-		if comperr.ShouldBeReturned {
-			return reconcile.Result{}, comperr.Error
+	err = r.resolver.ResolveObject(context.TODO(), memcached, resolved)
+	// Fix this to have more info on the nature of the error
+	if err != nil {
+		if sdk.IsRefNotFound(err) {
+			return reconcile.Result{}, err
 		}
-		reqLogger.Info("Error during resolve, but not returned", comperr.Error)
 		return reconcile.Result{}, nil
 	}
 
