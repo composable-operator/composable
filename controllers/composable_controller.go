@@ -26,6 +26,7 @@ import (
 	"github.com/go-logr/logr"
 	ibmcloudv1alpha1 "github.com/ibm/composable/api/v1alpha1"
 	sdk "github.com/ibm/composable/sdk"
+	"github.com/spf13/viper"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -314,7 +315,10 @@ func (r *composableReconciler) createUnderlyingObject(resource unstructured.Unst
 
 // SetupWithManager adds this controller to the manager
 func (r *composableReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r})
+	c, err := controller.New(controllerName, mgr, controller.Options{
+		Reconciler:              r,
+		MaxConcurrentReconciles: viper.GetInt("max-concurrent-reconciles"),
+	})
 	if err != nil {
 		return err
 	}
