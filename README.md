@@ -44,7 +44,7 @@ The Composable operator alleviates this problem by wrapping any resource (native
 allowing it to be specified with references to fields of other objects. These references are resolved dynamically
 by the Compsable controller when the data becomes available. This allows the yaml for the entire application to
 be deployed at once regardless of dependencies, and leverages Kubernetes native mechanisms to stage the deployment
-of different resources.
+of different resources. 
 
 For example, consider a `Knative` `KafkaSource` resource:
 
