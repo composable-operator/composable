@@ -16,13 +16,14 @@ limitations under the License.
 package main
 
 import (
-	"flag"
 	"os"
 	"time"
 
 	"github.com/go-logr/zapr"
 	ibmcloudv1alpha1 "github.com/ibm/composable/api/v1alpha1"
 	"github.com/ibm/composable/controllers"
+	flag "github.com/spf13/pflag"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -52,6 +53,10 @@ func main() {
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
 		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
+
+	flag.Int("max-concurrent-reconciles", 1, "Maximum number of concurrent reconciles for controllers.")
+	viper.BindPFlag("max-concurrent-reconciles", flag.Lookup("max-concurrent-reconciles"))
+
 	flag.Parse()
 
 	ctrl.SetLogger(zapr.NewLogger(contrZap.RawLoggerTo(os.Stderr, true, zap.AddCaller())))
