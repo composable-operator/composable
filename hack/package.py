@@ -261,7 +261,11 @@ with open(os.path.join(config,"templates","template.clusterserviceversion.yaml")
         if crd != None:
             description = defs['crd'][i]['description']
             crd_name = crd['metadata']['name']
-            crd_version = crd['spec']['version']
+            if 'version' in crd['spec']:
+                crd_version = crd['spec']['version']
+            else:
+                # deal with v1 CRD
+                crd_version = (crd['spec']['versions'][0]['name'])
             # fill in csv
             owned = {}
             owned['description'] = description
@@ -274,7 +278,8 @@ with open(os.path.join(config,"templates","template.clusterserviceversion.yaml")
             owned['statusDescriptors'] =  defs['crd'][i]['statusDescriptors']
             csv['spec']['customresourcedefinitions']['owned'].append(owned)
             # add examples
-            ex = json.loads(defs['crd'][i]['example'].decode('utf-8'), object_pairs_hook=OrderedDict)
+            # This works now only for Python 3
+            ex = json.loads(defs['crd'][i]['example'], object_pairs_hook=OrderedDict)
             alm_examples.append(ex)
         else:
             print("WARNING: kind %s not found!" % kind)    

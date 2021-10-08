@@ -1,4 +1,4 @@
 channels:
-- currentCSV: composable-operator.v0.1.4
+- currentCSV: composable-operator.v0.1.5
   name: alpha
 packageName: composable-operator

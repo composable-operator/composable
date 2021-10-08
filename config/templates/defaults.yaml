@@ -8,7 +8,7 @@ crd:
     - kind: Composable
       description: Overlay operator that allows its underlying object to be dynamically configurable
       example: |-
-        {"apiVersion": "ibmcloud.ibm.com/v1alpha1",
+        {"apiVersion": "ibmcloud.ibm.com/v1",
             "kind": "Composable",
             "metadata": {
               "name": "comp"

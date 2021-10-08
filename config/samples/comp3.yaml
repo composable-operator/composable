@@ -1,4 +1,4 @@
-apiVersion: ibmcloud.ibm.com/v1alpha1
+apiVersion: ibmcloud.ibm.com/v1
 kind: Composable
 metadata:
   labels:
