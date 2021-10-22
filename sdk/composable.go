@@ -23,21 +23,24 @@ var logf = log.Log.WithName("composable-sdk")
 
 // String constants
 const (
-	Metadata       = "metadata"
-	Namespace      = "namespace"
-	GetValueFrom   = "getValueFrom"
-	kind           = "kind"
-	apiVersion     = "apiVersion"
-	path           = "path"
-	Name           = "name"
-	Labels         = "labels"
-	Transformers   = "format-transformers"
-	defaultValue   = "defaultValue"
-	objectPrefix   = ".Object"
-	kindNotFound   = "Error resolving the kind for an object reference"
-	objectNotFound = "Error finding an object reference"
-	valueNotFound  = "Error finding a value in an object reference"
-	illFormedRef   = "Object reference is ill-formed"
+	Metadata              = "metadata"
+	Namespace             = "namespace"
+	GetValueFrom          = "getValueFrom"
+	InterpolateValuesFrom = "interpolateValuesFrom"
+	kind                  = "kind"
+	apiVersion            = "apiVersion"
+	path                  = "path"
+	Name                  = "name"
+	Labels                = "labels"
+	Transformers          = "format-transformers"
+	format                = "format"
+	inputs                = "inputs"
+	defaultValue          = "defaultValue"
+	objectPrefix          = ".Object"
+	kindNotFound          = "Error resolving the kind for an object reference"
+	objectNotFound        = "Error finding an object reference"
+	valueNotFound         = "Error finding a value in an object reference"
+	illFormedRef          = "Object reference is ill-formed"
 )
 
 // KubernetesResourceResolver implements the ResolveObject interface
@@ -109,6 +112,13 @@ func resolveFields(ctx context.Context, r client.Client, fields interface{}, com
 						return nil, err
 					}
 					fields = newFields
+				} else if k == InterpolateValuesFrom {
+					newFields, err = interpolateValues(ctx, r, v, composableNamespace, cache, discoveryClient)
+					if err != nil {
+						logf.Info("resolveFields interpolateValues 1", "err", err)
+						return nil, err
+					}
+					fields = newFields
 				} else if values, ok := v.(map[string]interface{}); ok {
 					if value, ok := values[GetValueFrom]; ok {
 						if len(values) > 1 {
@@ -117,6 +127,13 @@ func resolveFields(ctx context.Context, r client.Client, fields interface{}, com
 							return nil, err
 						}
 						newFields, err = resolveValue(ctx, r, value, composableNamespace, cache, discoveryClient)
+					} else if value, ok := values[InterpolateValuesFrom]; ok {
+						if len(values) > 1 {
+							err := fmt.Errorf("%s, %s", "InterpolateValuesFrom must be the only field in a value", illFormedRef)
+							logf.Error(err, "resolveFields", "values", values)
+							return nil, err
+						}
+						newFields, err = interpolateValues(ctx, r, value, composableNamespace, cache, discoveryClient)
 					} else {
 						newFields, err = resolveFields(ctx, r, values, composableNamespace, cache, discoveryClient)
 					}
@@ -286,6 +303,45 @@ func resolveValue(ctx context.Context, r client.Client, value interface{}, compo
 	err = fmt.Errorf("%s %T, %s ", "GetValueFrom is not well-formed, value type is not ", value, illFormedRef)
 	logf.Error(err, "resolveValue", "value", value)
 	return nil, err
+}
+
+func interpolateValues(ctx context.Context, r client.Client, value interface{}, composableNamespace string, cache *ComposableCache, discoveryClient discovery.ServerResourcesInterface) (interface{}, error) {
+	var err error
+
+	val, ok := value.(map[string]interface{})
+	if !ok {
+		err = fmt.Errorf("%s %T, %s ", "InterpolateValuesFrom is not well-formed, value type is not ", value, illFormedRef)
+		logf.Error(err, "resolveValue", "value", value)
+		return nil, err
+	}
+
+	objFormat, ok := val[format].(string)
+	if !ok {
+		err = fmt.Errorf("%s, %s ", "InterpolateValuesFrom is not well-formed, 'format' is not defined ", illFormedRef)
+		logf.Error(err, "resolveValue", "val", val)
+		return nil, err
+	}
+
+	objInputs, ok := val[inputs].([]interface{})
+	if !ok || len(objInputs) == 0 {
+		err = fmt.Errorf("%s, %s ", "InterpolateValuesFrom is not well-formed, 'inputs' is not defined ", illFormedRef)
+		logf.Error(err, "resolveValue", "val", val)
+		return nil, err
+	}
+
+	values := make([]interface{}, 0, len(objInputs))
+
+	for _, input := range objInputs {
+		value, err = resolveValue(ctx, r, input, composableNamespace, cache, discoveryClient)
+		if err != nil {
+			logf.Info("interpolateValues resolveValue", "err", err)
+			return nil, err
+		}
+		values = append(values, value)
+	}
+
+	return fmt.Sprintf(objFormat, values...), err
+
 }
 
 func getInputObject(ctx context.Context, r client.Client, val map[string]interface{}, objKind, apiversion, composableNamespace string, cache *ComposableCache, discoveryClient discovery.ServerResourcesInterface) (*unstructured.Unstructured, error) {
