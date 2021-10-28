@@ -36,7 +36,7 @@ install: manifests
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
 deploy: manifests
-	cd config/manager && kustomize edit set image controller=${IMG}
+	cd config/manager && kustomize edit set image composable=${IMG}
 	kustomize build config/default | kubectl apply -f -
 
 # Generate manifests e.g. CRD, RBAC etc.
@@ -102,7 +102,7 @@ endif
 
 # Run the operator-sdk scorecard on latest release
 scorecard:
-	hack/operator-scorecard.sh 
+	hack/operator-scorecard.sh
 
 # Push OLM metadata to private Quay registry
 push-olm: check-tag check-quaytoken check-quayns
@@ -116,10 +116,10 @@ endif
 
 check-quayns:
 ifndef QUAY_NS
-	$(error QUAY_NS is undefined!) 
+	$(error QUAY_NS is undefined!)
 endif
 
 check-quaytoken:
 ifndef QUAY_TOKEN
-	$(error QUAY_TOKEN is undefined!) 
+	$(error QUAY_TOKEN is undefined!)
 endif
