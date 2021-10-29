@@ -1,0 +1,19 @@
+name: Push to GCR
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+
+jobs:
+  push-to-gcr:
+    name: Push to GCR
+    runs-on: ubuntu-latest
+    steps:
+
+    - uses: tildabio/actions/push-to-gcr@main
+      with:
+        google-email: ${{ secrets.GKE_EMAIL }}
+        google-key: ${{ secrets.GKE_KEY }}
+        google-project: ${{ secrets.GKE_PROJECT }}
