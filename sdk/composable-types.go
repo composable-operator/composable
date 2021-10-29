@@ -31,6 +31,11 @@ type ComposableGetValueFrom struct {
 	FormatTransformers []string `json:"format-transformers,omitempty"`
 }
 
+type ComposableInterpolateValuesFrom struct {
+	Format string                   `json:"format"`
+	Inputs []ComposableGetValueFrom `json:"inputs"`
+}
+
 // ObjectRef is the type that can be used for cross-resource references
 // +kubebuilder:object:generate=true
 type ObjectRef struct {
