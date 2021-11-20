@@ -19,3 +19,8 @@ bases:
 - config/crd
 - config/rbac
 - config/manager
+
+images:
+- name: composable
+  newName: composable
+
