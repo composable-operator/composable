@@ -1,13 +1,10 @@
 language: go
 go:
-- 1.16.1
-dist: xenial
+- 1.17.8
+dist: focal
 services:
 - docker
 go_import_path: github.com/ibm/composable
-before_script:
-- declare -x GO111MODULE="on"
-- export GO111MODULE="on"
 before_install:
 - source ./tools/travis/travis-env.sh
 - source ./hack/latest_tag
