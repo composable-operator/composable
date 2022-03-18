@@ -1,0 +1,95 @@
+apiVersion: ibmcloud.ibm.com/v1alpha1
+kind: Composable
+metadata:
+  name: copy-values
+spec:
+  template: 
+    apiVersion: "test.ibmcloud.ibm.com/v1"
+    kind: OutputValue
+    metadata:
+      name: comp-out
+    spec:
+      instancename: compOut
+      intValue:
+        getValueFrom:
+          kind: InputValue
+          name: inputdata
+          namespace: default
+          defaultValue: 10
+          path: '{.spec.intValue}'
+      floatValue:
+        getValueFrom:
+          kind: InputValue
+          name: inputdata
+          namespace: default
+          defaultValue: 10.1
+          path: '{.spec.floatValue}'
+      boolValue:
+        getValueFrom:
+          kind: InputValue
+          name: inputdata
+          namespace: default
+          defaultValue: false
+          path: '{.spec.boolValue}'
+      stringValue:
+        getValueFrom:
+          kind: InputValue
+          name: inputdata
+          namespace: default
+          defaultValue: "default"
+          path: '{.spec.stringValue}'
+      stringFromBase64:
+        getValueFrom:
+          kind: InputValue
+          name: inputdata
+          namespace: default
+          defaultValue: "default"
+          path: '{.spec.base64Value}'
+          format-transformers:
+            - "Base64ToString"
+      arrayStrings:
+        getValueFrom:
+          kind: InputValue
+          name: inputdata
+          namespace: default
+          defaultValue:
+          - "aa"
+          - "bb"
+          - "cc"
+          path: '{.spec.arrayStrings}'
+      arrayIntegers:
+        getValueFrom:
+          kind: InputValue
+          name: inputdata
+          namespace: default
+          defaultValue:
+          - 1
+          - 0
+          - 1
+          path: '{.spec.arrayIntegers}'
+      objectValue:
+        getValueFrom:
+          kind: InputValue
+          name: inputdata
+          namespace: default
+          defaultValue:
+            first: "DefaultFirstName"
+            family: "DefaultFamilyName"
+            age: -1
+          path: '{.spec.objectValue}'
+      stringJson2Value:
+        getValueFrom:
+          kind: InputValue
+          name: inputdata
+          namespace: default
+          defaultValue: "default1,default2,default3"
+          path: '{.spec.jsonValue}'
+          format-transformers:
+            - "Base64ToString"
+            - "JsonToObject"
+            - "ArrayToCSString"
+
+
+
+
+

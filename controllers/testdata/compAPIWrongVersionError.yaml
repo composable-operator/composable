@@ -1,0 +1,25 @@
+apiVersion: ibmcloud.ibm.com/v1alpha1
+kind: Composable
+metadata:
+  name: api-version-error
+spec:
+  template: 
+    apiVersion: "test.ibmcloud.ibm.com/v1"
+    kind: OutputValueError
+    metadata:
+      name: services-out-version-error
+    spec:
+      instancename: services-out-error
+      testValue:
+        getValueFrom:
+          kind: Service
+          name: test-service
+          apiVersion: test.ibmcloud.ibm.com/v1beta1
+          namespace: default
+          path: '{.spec.sessionAffinity}'
+
+
+
+
+
+
