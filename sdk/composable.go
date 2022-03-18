@@ -11,8 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
-	memory "k8s.io/client-go/discovery/cached"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/third_party/forked/golang/template"
 	"k8s.io/client-go/util/jsonpath"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -424,10 +422,6 @@ func errorToDefaultValue(val map[string]interface{}, err error) (interface{}, er
 		return defaultValue, nil
 	}
 	return nil, err
-}
-
-func getDiscoveryClient(cfg *rest.Config) discovery.CachedDiscoveryInterface {
-	return memory.NewMemCacheClient(discovery.NewDiscoveryClientForConfigOrDie(cfg))
 }
 
 func objectKey(name string, namespace string, labels map[string]interface{}, gvk schema.GroupVersionKind) string {
