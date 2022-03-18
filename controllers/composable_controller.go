@@ -190,7 +190,6 @@ func (r *ComposableReconciler) updateObjectNamespace(ctx context.Context, object
 				err := fmt.Errorf("Failed: Template defines a wrong namespace %v", ns)
 				return object, err
 			}
-
 		} else {
 			objMap[sdk.Metadata].(map[string]interface{})[sdk.Namespace] = composableNamespace
 			logger.V(1).Info("objMap: ", "is", objMap)
@@ -205,8 +204,8 @@ func (r *ComposableReconciler) updateObjectNamespace(ctx context.Context, object
 
 func (r *ComposableReconciler) createUnderlyingObject(ctx context.Context, resource unstructured.Unstructured,
 	compInstance *ibmcloudv1alpha1.Composable,
-	status *ibmcloudv1alpha1.ComposableStatus) error {
-
+	status *ibmcloudv1alpha1.ComposableStatus,
+) error {
 	logger := log.FromContext(ctx)
 
 	name, err := getName(resource.Object)
@@ -290,7 +289,7 @@ func (r *ComposableReconciler) createUnderlyingObject(ctx context.Context, resou
 
 		if !reflect.DeepEqual(resource.Object[spec], underlyingObj.Object[spec]) {
 			underlyingObj.Object[spec] = resource.Object[spec]
-			//logger.Info("Updating underlying resource spec", "currentSpec", resource.Object[spec], "newSpec", underlyingObj.Object[spec], "resource", namespaced, "kind", kind, "apiVersion", apiversion)
+			// logger.Info("Updating underlying resource spec", "currentSpec", resource.Object[spec], "newSpec", underlyingObj.Object[spec], "resource", namespaced, "kind", kind, "apiVersion", apiversion)
 			err = r.Update(context.TODO(), underlyingObj)
 			if err != nil {
 

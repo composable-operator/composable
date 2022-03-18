@@ -25,7 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-//GetObject gets the object from the store
+// GetObject gets the object from the store
 func GetObject(tContext TestContext, obj client.Object) func() client.Object {
 	return func() client.Object {
 		key := client.ObjectKeyFromObject(obj)
@@ -36,7 +36,7 @@ func GetObject(tContext TestContext, obj client.Object) func() client.Object {
 	}
 }
 
-//GetObject gets the object from the store
+// GetObject gets the object from the store
 func GetUnstructuredObject(tContext TestContext, namespacedname types.NamespacedName, obj *unstructured.Unstructured) func() error {
 	return func() error {
 		client := tContext.Client()

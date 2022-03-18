@@ -27,19 +27,19 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-var (
-	testContext test.TestContext
-)
+var testContext test.TestContext
 
 var _ = Describe("test Composable operations", func() {
 	dataDir := "testdata/"
 	unstrObj := unstructured.Unstructured{}
 
-	strArray := []interface{}{"kafka01-prod02.messagehub.services.us-south.bluemix.net:9093",
+	strArray := []interface{}{
+		"kafka01-prod02.messagehub.services.us-south.bluemix.net:9093",
 		"kafka02-prod02.messagehub.services.us-south.bluemix.net:9093",
 		"kafka03-prod02.messagehub.services.us-south.bluemix.net:9093",
 		"kafka04-prod02.messagehub.services.us-south.bluemix.net:9093",
-		"kafka05-prod02.messagehub.services.us-south.bluemix.net:9093"}
+		"kafka05-prod02.messagehub.services.us-south.bluemix.net:9093",
+	}
 
 	AfterEach(func() {
 		// delete the Composable object
@@ -92,11 +92,9 @@ var _ = Describe("test Composable operations", func() {
 
 		By("default stringJson2Value")
 		Expect(testSpec["stringJson2Value"]).Should(BeEquivalentTo("default1,default2,default3"))
-
 	})
 
 	It("Composable should successfully copy values to the output object", func() {
-
 		By("Deploy input Object")
 		obj := test.LoadObject(dataDir+"inputDataObject.yaml", &unstructured.Unstructured{})
 		test.CreateObject(testContext, obj, false, 0)
@@ -149,16 +147,14 @@ var _ = Describe("test Composable operations", func() {
 		By("copy stringJson2Value")
 		val, _ := sdk.Array2CSStringTransformer(strArray)
 		Expect(testSpec["stringJson2Value"]).Should(BeEquivalentTo(val))
-
 	})
 	It("Composable should successfully update values of the output object", func() {
-
 		gvkIn := schema.GroupVersionKind{Kind: "InputValue", Version: "v1", Group: "test.ibmcloud.ibm.com"}
 		gvkOut := schema.GroupVersionKind{Kind: "OutputValue", Version: "v1", Group: "test.ibmcloud.ibm.com"}
 		objNamespacednameIn := types.NamespacedName{Namespace: "default", Name: "inputdata"}
 		objNamespacednameOut := types.NamespacedName{Namespace: testContext.Namespace(), Name: "comp-out"}
 
-		//unstrObj.SetGroupVersionKind(gvkOut)
+		// unstrObj.SetGroupVersionKind(gvkOut)
 		// First, the output object is created with default values, after that we deploy the inputObject and will check
 		// that all Output object filed are updated.
 		By("check that input object doesn't exist") // the object should not exist
@@ -264,7 +260,6 @@ var _ = Describe("Validate input objects Api grop and version discovery", func()
 		})
 
 		It("Composable should correctly discover required objects, core service without apiVersion", func() {
-
 			By("deploy Composable object " + "compServices.yaml")
 			comp := test.LoadComposable(dataDir + "compServices.yaml")
 			test.PostInNs(testContext, &comp, false, 0)
@@ -285,7 +280,6 @@ var _ = Describe("Validate input objects Api grop and version discovery", func()
 		})
 
 		It("Composable should correctly discover required objects, , core service with apiVersion=v1", func() {
-
 			//By("deploy K8s Service")
 			//kubeObj := test.LoadObject(dataDir+"serviceK8s.yaml", &v1.Service{})
 			//test.CreateObject(testContext, kubeObj, false, 0)
@@ -316,7 +310,6 @@ var _ = Describe("Validate input objects Api grop and version discovery", func()
 		})
 
 		It("Composable should fail to discover correct Service recourse, when there are several groups with the same Kind", func() {
-
 			By("deploy Composable object " + "compAPIError.yaml")
 			comp := test.LoadComposable(dataDir + "compAPIError.yaml")
 			test.PostInNs(testContext, &comp, false, 0)
@@ -327,10 +320,8 @@ var _ = Describe("Validate input objects Api grop and version discovery", func()
 
 			By("validate that Composable object status is FailedStatus")
 			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(FailedStatus))
-
 		})
 		It("Composable should fail to discover correct Service recourse, when a wring API version is provided", func() {
-
 			By("deploy Composable object " + "compAPIWrongVersionError.yaml")
 			comp := test.LoadComposable(dataDir + "compAPIWrongVersionError.yaml")
 			test.PostInNs(testContext, &comp, false, 0)
@@ -341,9 +332,7 @@ var _ = Describe("Validate input objects Api grop and version discovery", func()
 
 			By("validate that Composable object status is FailedStatus")
 			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(FailedStatus))
-
 		})
-
 	})
 })
 
@@ -462,7 +451,6 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 
 	Context("create Service instance from ibmcloud.ibm.com WITHOUT external dependencies", func() {
 		It("should correctly create the Service instance", func() {
-
 			comp := test.LoadComposable(dataDir + "comp.yaml")
 			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
@@ -472,7 +460,6 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 			unstrObj.SetGroupVersionKind(groupVersionKind)
 			Eventually(test.GetUnstructuredObject(testContext, objNamespacedname, &unstrObj)).Should(Succeed())
 			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(OnlineStatus))
-
 		})
 
 		It("should delete the Composable and Service instances", func() {
@@ -493,7 +480,6 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 				}).Should(BeTrue())
 			*/
 		})
-
 	})
 
 	Context("create Service instance from ibmcloud.ibm.com WITH external dependencies", func() {
@@ -566,7 +552,6 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 			Eventually(test.GetObject(testContext, &comp)).Should(BeNil())
 		})
 	})
-
 })
 
 // returns service plan of Service.ibmcloud.ibm.com

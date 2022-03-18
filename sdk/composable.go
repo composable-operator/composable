@@ -83,13 +83,12 @@ func (k KubernetesResourceResolver) ResolveObject(ctx context.Context, object in
 // Resolve resolves an object and returns an Unstructured
 // This method assumes that the objMap is an object that has a metadata section with a namespace defined
 func resolve(ctx context.Context, r client.Client, discoveryClient discovery.ServerResourcesInterface, objMap map[string]interface{}, defaultNamespace string) (interface{}, error) {
-
 	cache := &ComposableCache{objects: make(map[string]interface{})}
 	obj, err := resolveFields(ctx, r, objMap, defaultNamespace, cache, discoveryClient)
 	if err != nil {
 		return nil, err
 	}
-	//ret := unstructured.Unstructured{Object: obj.(map[string]interface{})}
+	// ret := unstructured.Unstructured{Object: obj.(map[string]interface{})}
 	return obj, nil
 }
 
@@ -180,7 +179,7 @@ func groupQualifiedName(name, group string) string {
 }
 
 func lookupAPIResource(discoveryClient discovery.ServerResourcesInterface, objKind, apiVersion string) (*metav1.APIResource, error) {
-	//r.log.V(1).Info("lookupAPIResource", "objKind", objKind, "apiVersion", apiVersion)
+	// r.log.V(1).Info("lookupAPIResource", "objKind", objKind, "apiVersion", apiVersion)
 	var resources []*metav1.APIResourceList
 	var err error
 	if len(apiVersion) > 0 {
@@ -246,7 +245,7 @@ Loop:
 }
 
 func resolveValue(ctx context.Context, r client.Client, value interface{}, composableNamespace string, cache *ComposableCache, discoveryClient discovery.ServerResourcesInterface) (interface{}, error) {
-	//r.log.Info("resolveValue", "value", value)
+	// r.log.Info("resolveValue", "value", value)
 	var err error
 	if val, ok := value.(map[string]interface{}); ok {
 		if objKind, ok := val[kind].(string); ok {
@@ -345,7 +344,7 @@ func getInputObject(ctx context.Context, r client.Client, val map[string]interfa
 			cache.objects[key] = toumbstone{err: err}
 			return nil, err
 		}
-	} else { //labelsOK
+	} else { // labelsOK
 		strLabels := make(map[string]string)
 		for key, value := range intLabels {
 			strValue := fmt.Sprintf("%v", value)

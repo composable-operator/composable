@@ -157,7 +157,7 @@ func (r *Composable) findGetValueFrom(path *field.Path, m map[string]interface{}
 				}
 				// TODO: set the value to an appropriate type e.g. int, string, etc
 				m[k] = "abc"
-			} else { //recursive checking the sub-elements
+			} else { // recursive checking the sub-elements
 				if err := r.findGetValueFrom(mykey, vv); err != nil {
 					allErrs = append(allErrs, err...)
 				}

@@ -25,7 +25,6 @@ import (
 )
 
 func TestAdmissionControl(t *testing.T) {
-
 	embeddedGood := []byte(`{
 		"apiVersion": "v1", 
 		"kind": "ConfigMap",
@@ -86,8 +85,10 @@ func TestAdmissionControl(t *testing.T) {
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Composable",
-			APIVersion: GroupVersion.String()},
-		Spec: ComposableSpec{Template: &runtime.RawExtension{Raw: embeddedGood}}}
+			APIVersion: GroupVersion.String(),
+		},
+		Spec: ComposableSpec{Template: &runtime.RawExtension{Raw: embeddedGood}},
+	}
 	createdBad := &Composable{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foobad",
@@ -95,8 +96,10 @@ func TestAdmissionControl(t *testing.T) {
 		},
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Composable",
-			APIVersion: GroupVersion.String()},
-		Spec: ComposableSpec{Template: &runtime.RawExtension{Raw: embeddedBad}}}
+			APIVersion: GroupVersion.String(),
+		},
+		Spec: ComposableSpec{Template: &runtime.RawExtension{Raw: embeddedBad}},
+	}
 
 	g := gomega.NewGomegaWithT(t)
 
@@ -107,7 +110,7 @@ func TestAdmissionControl(t *testing.T) {
 	g.Expect(len(err)).To(gomega.BeZero())
 
 	// ToBeInvestigated (it fails to initiate the client)
-	//g.Expect(createdGood.dryRun(m, OperationCreate)).To(gomega.BeNil())
+	// g.Expect(createdGood.dryRun(m, OperationCreate)).To(gomega.BeNil())
 
 	// Test validating webhook with an invalid template
 	g.Expect(createdBad.validateAPIVersionKind(createdBad.Spec.Template, field.NewPath("spec").Child("template"))).NotTo(gomega.BeNil())

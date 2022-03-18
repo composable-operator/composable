@@ -25,7 +25,6 @@ import (
 
 // ComposableSpec defines the desired state of Composable
 type ComposableSpec struct {
-
 	// Template defines the underlying object
 	Template *runtime.RawExtension `json:"template"`
 }
