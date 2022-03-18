@@ -20,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"reflect"
 	"time"
 
@@ -138,16 +137,6 @@ func (r *ComposableReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			}
 		}
 	}()
-
-	// Validate the embedded template if Composable's admission control webhook is not running
-	if os.Getenv("ADMISSION_CONTROL") != "true" {
-		err := validateComposable(compInstance)
-		if err != nil {
-			status.State = FailedStatus
-			status.Message = "Request is malformed and failed validation. " + err.Error()
-			return ctrl.Result{}, nil
-		}
-	}
 
 	// If Status is not set, set it to Pending
 	if reflect.DeepEqual(compInstance.Status, ibmcloudv1alpha1.ComposableStatus{}) {
