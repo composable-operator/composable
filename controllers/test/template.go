@@ -17,6 +17,7 @@
 package test
 
 import (
+	"context"
 	"io/ioutil"
 	"time"
 
@@ -48,7 +49,7 @@ func CreateObject(tContext TestContext, obj client.Object, async bool, delay tim
 		if delay > 0 {
 			time.Sleep(delay)
 		}
-		err := tContext.Client().Create(tContext, obj)
+		err := tContext.Client().Create(context.TODO(), obj) // FIXME proper context propagation
 		if err != nil {
 			panic(err)
 		}
@@ -69,7 +70,7 @@ func UpdateObject(tContext TestContext, obj client.Object, async bool, delay tim
 		if delay > 0 {
 			time.Sleep(delay)
 		}
-		err := tContext.Client().Update(tContext, obj)
+		err := tContext.Client().Update(context.TODO(), obj)
 		if err != nil {
 			panic(err)
 		}
@@ -87,7 +88,7 @@ func DeleteObject(tContext TestContext, obj client.Object, async bool) {
 	done := make(chan bool)
 
 	go func() {
-		err := tContext.Client().Delete(tContext, obj)
+		err := tContext.Client().Delete(context.TODO(), obj)
 		if err != nil && !errors.IsNotFound(err) {
 			panic(err)
 		}

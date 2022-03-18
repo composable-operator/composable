@@ -29,7 +29,7 @@ import (
 func GetObject(tContext TestContext, obj client.Object) func() client.Object {
 	return func() client.Object {
 		key := client.ObjectKeyFromObject(obj)
-		if err := tContext.Client().Get(tContext, key, obj); err != nil {
+		if err := tContext.Client().Get(context.TODO(), key, obj); err != nil {
 			return nil
 		}
 		return obj

@@ -88,10 +88,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.ComposableReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	reconciler := controllers.NewReconciler(mgr)
+	if err = reconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Composable")
 		os.Exit(1)
 	}

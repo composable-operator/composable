@@ -321,7 +321,7 @@ var _ = Describe("Validate input objects Api grop and version discovery", func()
 			By("validate that Composable object status is FailedStatus")
 			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(FailedStatus))
 		})
-		It("Composable should fail to discover correct Service recourse, when a wring API version is provided", func() {
+		It("Composable should fail to discover correct Service recourse, when a wrong API version is provided", func() {
 			By("deploy Composable object " + "compAPIWrongVersionError.yaml")
 			comp := test.LoadComposable(dataDir + "compAPIWrongVersionError.yaml")
 			test.PostInNs(testContext, &comp, false, 0)
@@ -358,7 +358,7 @@ var _ = Describe("Find input objects according their labels", func() {
 			test.DeleteObject(testContext, tObj, false)
 			Eventually(test.GetObject(testContext, tObj)).Should(BeNil())
 		})
-		It("Deployment should fail with the `neither 'name' nor 'labels' are not defined` error", func() {
+		It("Deployment should fail with the `neither 'name' nor 'labels' are defined (one expected)` error", func() {
 			By("deploy Composable object " + "compLabels.yaml" + " without name and labels")
 			comp := test.LoadComposable(dataDir + "compLabels.yaml")
 			unstrObj := unstructured.Unstructured{}
@@ -370,18 +370,18 @@ var _ = Describe("Find input objects according their labels", func() {
 			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(FailedStatus))
-			Expect(test.GetStatusMessage(testContext, &comp)()).Should(ContainSubstring("missing required field \"name\" or \"labels\""))
+			Expect(test.GetStatusMessage(testContext, &comp)()).Should(ContainSubstring("neither 'name' nor 'labels' are defined (one expected)"))
 			test.DeleteInNs(testContext, &comp, false)
 			Eventually(test.GetObject(testContext, &comp)).Should(BeNil())
 		})
 
-		It("Deployment should fail with the `both 'name' and 'labels' cannot be defined` error", func() {
+		It("Deployment should fail with the `bboth 'name' and 'labels' cannot be defined at the same time` error", func() {
 			By("deploy Composable object " + "compLabels.yaml" + " with both name and labels")
 			comp := test.LoadComposable(dataDir + "compLabels.yaml")
 			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(FailedStatus))
-			Expect(test.GetStatusMessage(testContext, &comp)()).Should(ContainSubstring("cannot specify both \"name\" and \"labels\""))
+			Expect(test.GetStatusMessage(testContext, &comp)()).Should(ContainSubstring("both 'name' and 'labels' cannot be defined at the same time"))
 			test.DeleteInNs(testContext, &comp, false)
 			Eventually(test.GetObject(testContext, &comp)).Should(BeNil())
 		})

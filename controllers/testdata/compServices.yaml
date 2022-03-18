@@ -6,9 +6,9 @@ spec:
   template: 
     apiVersion: "test.ibmcloud.ibm.com/v1"
     kind: OutputValue
-    metadata:
+    metadata: |
       name: services-out
-    spec:
+    spec: |
       instancename: services-out
       k8sValue:
         getValueFrom:

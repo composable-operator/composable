@@ -57,6 +57,7 @@ spec:
               template:
                 description: Template defines the underlying object
                 type: object
+                x-kubernetes-preserve-unknown-fields: true
             required:
             - template
             type: object

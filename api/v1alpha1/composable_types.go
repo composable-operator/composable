@@ -26,6 +26,7 @@ import (
 // ComposableSpec defines the desired state of Composable
 type ComposableSpec struct {
 	// Template defines the underlying object
+	//+kubebuilder:validation:XPreserveUnknownFields
 	Template *runtime.RawExtension `json:"template"`
 }
 

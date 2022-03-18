@@ -154,6 +154,9 @@ func (r *ComposableReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	updated, err := r.updateObjectNamespace(ctx, object, compInstance.Namespace)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
 	resource := &unstructured.Unstructured{}
 	resource.Object = make(map[string]interface{})
@@ -332,10 +335,13 @@ func getState(obj map[string]interface{}) (string, error) {
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ComposableReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	ctrl, err := ctrl.NewControllerManagedBy(mgr).
 		For(&ibmcloudv1alpha1.Composable{}).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: viper.GetInt("max-concurrent-reconciles"),
-		}).
-		Complete(r)
+		}).Build(r)
+
+	r.setController(ctrl)
+
+	return err
 }
