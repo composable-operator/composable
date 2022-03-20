@@ -280,15 +280,7 @@ var _ = Describe("Validate input objects Api grop and version discovery", func()
 		})
 
 		It("Composable should correctly discover required objects, , core service with apiVersion=v1", func() {
-			//By("deploy K8s Service")
-			//kubeObj := test.LoadObject(dataDir+"serviceK8s.yaml", &v1.Service{})
-			//test.CreateObject(testContext, kubeObj, false, 0)
-			//Eventually(test.GetObject(testContext, kubeObj)).ShouldNot(BeNil())
-			//
-			//By("deploy test Service")
-			//tObj := test.LoadObject(dataDir+"serviceTest.yaml", &unstructured.Unstructured{})
-			//test.CreateObject(testContext, tObj, false, 0)
-			//Eventually(test.GetObject(testContext, tObj)).ShouldNot(BeNil())
+			// Services referenced are deployed by a previous testcase already
 
 			By("deploy Composable object " + "compServicesV1.yaml")
 			comp := test.LoadComposable(dataDir + "compServicesV1.yaml")

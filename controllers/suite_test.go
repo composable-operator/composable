@@ -26,7 +26,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -41,8 +40,12 @@ import (
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
+const (
+	DEFAULT_EVENTUALLY_TIMEOUT = 60 * time.Second
+	SYNC_PERIOD                = 10 * time.Second
+)
+
 var (
-	cfg       *rest.Config
 	k8sClient client.Client
 	testEnv   *envtest.Environment
 	ctx       context.Context
@@ -70,6 +73,7 @@ var _ = BeforeSuite(func() {
 		},
 		ErrorIfCRDPathMissing: true,
 	}
+	SetDefaultEventuallyTimeout(DEFAULT_EVENTUALLY_TIMEOUT) // Reduce number of flaky (time-dependant) tests
 
 	cfg, err := testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
@@ -84,7 +88,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
-	syncPeriod := 10 * time.Second
+	syncPeriod := SYNC_PERIOD
 	k8sManager, err := ctrl.NewManager(cfg, ctrl.Options{
 		SyncPeriod: &syncPeriod,
 		Scheme:     scheme.Scheme,
@@ -108,6 +112,7 @@ var _ = BeforeSuite(func() {
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
 	cancel()
+	time.Sleep(1 * time.Second)
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
