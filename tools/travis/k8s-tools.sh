@@ -22,11 +22,11 @@ if [ -n "${SKIP_K8S_TOOLS}" ]; then
 fi
 
 if [ -z ${KB_VERSION+x} ]; then
-    KB_VERSION=1.0.8 
+    KB_VERSION=3.3.0
 fi
 
 if [ -z ${KUSTOMIZE_VERSION+x} ]; then
-    KUSTOMIZE_VERSION=1.0.10
+    KUSTOMIZE_VERSION=4.5.2
 fi
 
 echo "installing kubectl"
@@ -47,8 +47,3 @@ curl -OL "https://github.com/kubernetes-sigs/kustomize/releases/download/v${KUST
 sudo chmod +x kustomize_${KUSTOMIZE_VERSION}_linux_amd64
 sudo mv kustomize_${KUSTOMIZE_VERSION}_linux_amd64 /usr/local/bin/kustomize
 kustomize version
-
-echo "installing cert-manager"
-#kubectl create namespace cert-manager
-#kubectl label namespace cert-manager certmanager.k8s.io/disable-validation=true
-#kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v0.10.0/cert-manager.yaml
