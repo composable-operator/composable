@@ -8,7 +8,7 @@ go_import_path: github.com/ibm/composable
 before_install:
 - source ./tools/travis/travis-env.sh
 - source ./hack/latest_tag
-- ./tools/travis/k8s-tools.sh
+  # - ./tools/travis/k8s-tools.sh
 script:
 - make generate
 - make lintall
