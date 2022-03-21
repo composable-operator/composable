@@ -24,8 +24,3 @@ spec:
           apiVersion: test.ibmcloud.ibm.com/v1
           namespace: default
           path: '{.spec.sessionAffinity}'
-
-
-
-
-

@@ -30,7 +30,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
-	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
@@ -55,7 +55,7 @@ func (r *Composable) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 
-// +kubebuilder:webhook:path=/mutate-ibmcloud-ibm-com-v1alpha1-composable,mutating=true,failurePolicy=fail,groups=ibmcloud.ibm.com,resources=composables,verbs=create;update,versions=v1alpha1,name=mcomposable.kb.io
+//+kubebuilder:webhook:path=/mutate-ibmcloud-ibm-com-v1alpha1-composable,mutating=true,failurePolicy=fail,sideEffects=None,groups=ibmcloud.ibm.com,resources=composables,verbs=create;update,versions=v1alpha1,name=mcomposable.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Defaulter = &Composable{}
 
@@ -68,7 +68,7 @@ func (r *Composable) Default() {
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-// +kubebuilder:webhook:verbs=create;update,path=/validate-ibmcloud-ibm-com-v1alpha1-composable,mutating=false,failurePolicy=fail,groups=ibmcloud.ibm.com,resources=composables,versions=v1alpha1,name=vcomposable.kb.io
+//+kubebuilder:webhook:path=/validate-ibmcloud-ibm-com-v1alpha1-composable,mutating=false,failurePolicy=fail,sideEffects=None,groups=ibmcloud.ibm.com,resources=composables,verbs=create;update,versions=v1alpha1,name=vcomposable.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &Composable{}
 
@@ -157,7 +157,7 @@ func (r *Composable) findGetValueFrom(path *field.Path, m map[string]interface{}
 				}
 				// TODO: set the value to an appropriate type e.g. int, string, etc
 				m[k] = "abc"
-			} else { //recursive checking the sub-elements
+			} else { // recursive checking the sub-elements
 				if err := r.findGetValueFrom(mykey, vv); err != nil {
 					allErrs = append(allErrs, err...)
 				}
@@ -262,13 +262,13 @@ func (r *Composable) dryRun(m map[string]interface{}, op string) *field.Error {
 	u := unstructured.Unstructured{Object: m}
 	composablelog.Info("dry-run", "obj", u.Object)
 	if op == OperationCreate {
-		if err = cl.Create(context.TODO(), &u, client.CreateDryRunAll); err != nil {
+		if err = cl.Create(context.TODO(), &u, client.DryRunAll); err != nil {
 			composablelog.Info("create dry-run failed", "name", r.Name, "err", err.Error())
 			return field.Invalid(field.NewPath("spec").Child("template"), r.Name, err.Error())
 		}
 	}
 	if op == OperationUpdate {
-		if err = cl.Update(context.TODO(), &u, client.UpdateDryRunAll); err != nil {
+		if err = cl.Update(context.TODO(), &u, client.DryRunAll); err != nil {
 			composablelog.Info("update dry-run failed", "name", r.Name, "err", err.Error())
 			return field.Invalid(field.NewPath("spec").Child("template"), r.Name, err.Error())
 		}

@@ -1,7 +1,20 @@
-version: "2"
 domain: ibm.com
+layout:
+- go.kubebuilder.io/v3
+projectName: composable
 repo: github.com/ibm/composable
 resources:
-- group: ibmcloud
-  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: ibm.com
+  group: ibmcloud
   kind: Composable
+  path: github.com/ibm/composable/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+version: "3"

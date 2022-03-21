@@ -12,7 +12,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package sdk
 
 import (
 	. "github.com/onsi/ginkgo"
@@ -28,7 +28,7 @@ type Planet struct {
 var _ = Describe("./pkg/controller/composable/trnsformers", func() {
 	DescribeTable("Test CompoundTransformerNames",
 		func(inputVal interface{}, transformerNames []string, expectedVal interface{}) {
-			Ω(CompoundTransformerNames(inputVal, transformerNames...)).Should(Equal(expectedVal))
+			Expect(CompoundTransformerNames(inputVal, transformerNames...)).Should(Equal(expectedVal))
 		},
 		Entry("ToString, StringToInt", 12, []string{ToString, StringToInt}, 12),
 		Entry("StringToInt, ToString", "12", []string{StringToInt, ToString}, "12"),
@@ -50,7 +50,7 @@ var _ = Describe("./pkg/controller/composable/trnsformers", func() {
 
 	DescribeTable("Test Array2CSStringTransformer",
 		func(inputVal interface{}, expectedVal interface{}) {
-			Ω(Array2CSStringTransformer(inputVal)).Should(Equal(expectedVal))
+			Expect(Array2CSStringTransformer(inputVal)).Should(Equal(expectedVal))
 		},
 		Entry("strings array", []string{"a", "b", "cd", "efg"}, "a,b,cd,efg"),
 		Entry("int32 array", []int32{1, 2, 34, 567}, "1,2,34,567"),

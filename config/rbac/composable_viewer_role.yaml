@@ -1,0 +1,20 @@
+# permissions for end users to view composables.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: composable-viewer-role
+rules:
+- apiGroups:
+  - ibmcloud.ibm.com
+  resources:
+  - composables
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ibmcloud.ibm.com
+  resources:
+  - composables/status
+  verbs:
+  - get
