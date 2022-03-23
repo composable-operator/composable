@@ -57,6 +57,7 @@ func main() {
 	var developmentMode bool
 	var probeAddr string
 	var syncPeriod time.Duration
+	var operatorNamespace string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -64,6 +65,12 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.BoolVar(&developmentMode, "development-mode", false, "Enable development mode")
 	flag.DurationVar(&syncPeriod, "sync-period", 60*time.Second, "Sync period")
+	flag.Int("max-concurrent-reconciles", 1, "Maximum number of concurrent reconciles for controllers.")
+	viper.BindPFlag("max-concurrent-reconciles", flag.Lookup("max-concurrent-reconciles"))
+	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
+	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
+		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
+	flag.StringVar(&operatorNamespace, "operator-namespace", "", "Namespace for the manager to watch.")
 	flag.Int("max-concurrent-reconciles", 1, "Maximum number of concurrent reconciles for controllers.")
 	viper.BindPFlag("max-concurrent-reconciles", flag.Lookup("max-concurrent-reconciles"))
 	flag.Parse()
@@ -82,6 +89,7 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "c0f58598.ibm.com",
+		Namespace:          operatorNamespace,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
