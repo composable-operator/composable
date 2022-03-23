@@ -89,7 +89,7 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "c0f58598.ibm.com",
-		Namespace:          operatorNamespace,
+		Namespace:              operatorNamespace,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
