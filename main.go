@@ -67,12 +67,7 @@ func main() {
 	flag.DurationVar(&syncPeriod, "sync-period", 60*time.Second, "Sync period")
 	flag.Int("max-concurrent-reconciles", 1, "Maximum number of concurrent reconciles for controllers.")
 	viper.BindPFlag("max-concurrent-reconciles", flag.Lookup("max-concurrent-reconciles"))
-	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
-		"Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&operatorNamespace, "operator-namespace", "", "Namespace for the manager to watch.")
-	flag.Int("max-concurrent-reconciles", 1, "Maximum number of concurrent reconciles for controllers.")
-	viper.BindPFlag("max-concurrent-reconciles", flag.Lookup("max-concurrent-reconciles"))
 	flag.Parse()
 
 	opts := zap.Options{
