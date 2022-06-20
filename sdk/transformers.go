@@ -12,7 +12,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1
+package sdk
 
 import (
 	"encoding/base64"
@@ -112,10 +112,9 @@ func string2Transformer(transformerName string) (Transformer, error) {
 	default:
 		return nil, fmt.Errorf("Wrong transformer name %q", transformerName)
 	}
-
 }
 
-//Array2CSStringTransformer ...
+// Array2CSStringTransformer ...
 func Array2CSStringTransformer(intValue interface{}) (interface{}, error) {
 	var str strings.Builder
 	switch reflect.TypeOf(intValue).Kind() {

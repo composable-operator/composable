@@ -1,23 +1,19 @@
 language: go
 go:
-- 1.13.15
-dist: xenial
+- 1.17.8
+dist: focal
 services:
 - docker
 go_import_path: github.com/ibm/composable
-before_script:
-- declare -x GO111MODULE="on"
-- export GO111MODULE="on"
 before_install:
 - source ./tools/travis/travis-env.sh
 - source ./hack/latest_tag
-- "./tools/travis/k8s-tools.sh"
+  # - ./tools/travis/k8s-tools.sh
 script:
 - make generate
-- make lintall
 - make test
 after_success:
-- make push
+# FIXME - make push
 - test "$TRAVIS_EVENT_TYPE" != "pull_request" && make docker-build || echo "success"
 branches:
   only:

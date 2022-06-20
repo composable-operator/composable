@@ -17,32 +17,29 @@
 package controllers
 
 import (
+	"github.com/ibm/composable/controllers/test"
 	sdk "github.com/ibm/composable/sdk"
-	"github.com/ibm/composable/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/klog"
 )
 
-var (
-	testContext test.TestContext
-	//testEnv     *envtest.Environment
-	stop chan struct{}
-)
+var testContext test.TestContext
 
 var _ = Describe("test Composable operations", func() {
 	dataDir := "testdata/"
 	unstrObj := unstructured.Unstructured{}
 
-	strArray := []interface{}{"kafka01-prod02.messagehub.services.us-south.bluemix.net:9093",
+	strArray := []interface{}{
+		"kafka01-prod02.messagehub.services.us-south.bluemix.net:9093",
 		"kafka02-prod02.messagehub.services.us-south.bluemix.net:9093",
 		"kafka03-prod02.messagehub.services.us-south.bluemix.net:9093",
 		"kafka04-prod02.messagehub.services.us-south.bluemix.net:9093",
-		"kafka05-prod02.messagehub.services.us-south.bluemix.net:9093"}
+		"kafka05-prod02.messagehub.services.us-south.bluemix.net:9093",
+	}
 
 	AfterEach(func() {
 		// delete the Composable object
@@ -65,42 +62,39 @@ var _ = Describe("test Composable operations", func() {
 		groupVersionKind := schema.GroupVersionKind{Kind: "OutputValue", Version: "v1", Group: "test.ibmcloud.ibm.com"}
 		unstrObj.SetGroupVersionKind(groupVersionKind)
 		objNamespacedname := types.NamespacedName{Namespace: testContext.Namespace(), Name: "comp-out"}
-		klog.V(5).Infof("Get Object %s\n", objNamespacedname)
 		Eventually(test.GetUnstructuredObject(testContext, objNamespacedname, &unstrObj)).Should(Succeed())
 		testSpec, ok := unstrObj.Object[spec].(map[string]interface{})
-		Ω(ok).Should(BeTrue())
+		Expect(ok).Should(BeTrue())
 
 		By("default intValue")
-		Ω(testSpec["intValue"]).Should(BeEquivalentTo(10))
+		Expect(testSpec["intValue"]).Should(BeEquivalentTo(10))
 
 		By("default floatValue")
-		Ω(testSpec["floatValue"]).Should(BeEquivalentTo(10.1))
+		Expect(testSpec["floatValue"]).Should(BeEquivalentTo(10.1))
 
 		By("default boolValue")
-		Ω(testSpec["boolValue"]).Should(BeFalse())
+		Expect(testSpec["boolValue"]).Should(BeFalse())
 
 		By("default stringValue")
-		Ω(testSpec["stringValue"]).Should(Equal("default"))
+		Expect(testSpec["stringValue"]).Should(Equal("default"))
 
 		By("default stringFromBase64")
-		Ω(testSpec["stringFromBase64"]).Should(Equal("default"))
+		Expect(testSpec["stringFromBase64"]).Should(Equal("default"))
 
 		By("default arrayStrings")
-		Ω(testSpec["arrayStrings"]).Should(BeEquivalentTo([]interface{}{"aa", "bb", "cc"}))
+		Expect(testSpec["arrayStrings"]).Should(BeEquivalentTo([]interface{}{"aa", "bb", "cc"}))
 
 		By("default arrayIntegers")
-		Ω(testSpec["arrayIntegers"]).Should(BeEquivalentTo([]interface{}{int64(1), int64(0), int64(1)}))
+		Expect(testSpec["arrayIntegers"]).Should(BeEquivalentTo([]interface{}{int64(1), int64(0), int64(1)}))
 
 		By("default objectValue")
-		Ω(testSpec["objectValue"]).Should(BeEquivalentTo(map[string]interface{}{"family": "DefaultFamilyName", "first": "DefaultFirstName", "age": int64(-1)}))
+		Expect(testSpec["objectValue"]).Should(BeEquivalentTo(map[string]interface{}{"family": "DefaultFamilyName", "first": "DefaultFirstName", "age": int64(-1)}))
 
 		By("default stringJson2Value")
-		Ω(testSpec["stringJson2Value"]).Should(BeEquivalentTo("default1,default2,default3"))
-
+		Expect(testSpec["stringJson2Value"]).Should(BeEquivalentTo("default1,default2,default3"))
 	})
 
 	It("Composable should successfully copy values to the output object", func() {
-
 		By("Deploy input Object")
 		obj := test.LoadObject(dataDir+"inputDataObject.yaml", &unstructured.Unstructured{})
 		test.CreateObject(testContext, obj, false, 0)
@@ -109,7 +103,6 @@ var _ = Describe("test Composable operations", func() {
 		groupVersionKind := schema.GroupVersionKind{Kind: "InputValue", Version: "v1", Group: "test.ibmcloud.ibm.com"}
 		unstrObj.SetGroupVersionKind(groupVersionKind)
 		objNamespacedname := types.NamespacedName{Namespace: "default", Name: "inputdata"}
-		klog.V(5).Infof("Get Object %s\n", objNamespacedname)
 		Eventually(test.GetUnstructuredObject(testContext, objNamespacedname, &unstrObj)).Should(Succeed())
 
 		By("Deploy Composable object")
@@ -122,54 +115,51 @@ var _ = Describe("test Composable operations", func() {
 		groupVersionKind = schema.GroupVersionKind{Kind: "OutputValue", Version: "v1", Group: "test.ibmcloud.ibm.com"}
 		unstrObj.SetGroupVersionKind(groupVersionKind)
 		objNamespacedname = types.NamespacedName{Namespace: testContext.Namespace(), Name: "comp-out"}
-		klog.V(5).Infof("Get Object %s\n", objNamespacedname)
 		Eventually(test.GetUnstructuredObject(testContext, objNamespacedname, &unstrObj)).Should(Succeed())
 		testSpec, ok := unstrObj.Object[spec].(map[string]interface{})
-		Ω(ok).Should(BeTrue())
+		Expect(ok).Should(BeTrue())
 
 		By("copy intValue")
 		// We use Eventually so the controller will be able to update teh destination object
-		Ω(testSpec["intValue"]).Should(BeEquivalentTo(12))
+		Expect(testSpec["intValue"]).Should(BeEquivalentTo(12))
 		//
 		By("copy floatValue")
-		Ω(testSpec["floatValue"].(float64)).Should(BeEquivalentTo(23.5))
+		Expect(testSpec["floatValue"].(float64)).Should(BeEquivalentTo(23.5))
 
 		By("copy boolValue")
-		Ω(testSpec["boolValue"]).Should(BeTrue())
+		Expect(testSpec["boolValue"]).Should(BeTrue())
 
 		By("copy stringValue")
-		Ω(testSpec["stringValue"]).Should(Equal("Hello world"))
+		Expect(testSpec["stringValue"]).Should(Equal("Hello world"))
 
 		By("copy stringFromBase64")
-		Ω(testSpec["stringFromBase64"]).Should(Equal("9376"))
+		Expect(testSpec["stringFromBase64"]).Should(Equal("9376"))
 
 		By("copy arrayStrings")
-		Ω(testSpec["arrayStrings"]).Should(Equal(strArray))
+		Expect(testSpec["arrayStrings"]).Should(Equal(strArray))
 
 		By("copy arrayIntegers")
-		Ω(testSpec["arrayIntegers"]).Should(Equal([]interface{}{int64(1), int64(2), int64(3), int64(4)}))
+		Expect(testSpec["arrayIntegers"]).Should(Equal([]interface{}{int64(1), int64(2), int64(3), int64(4)}))
 
 		By("copy objectValue")
-		Ω(testSpec["objectValue"]).Should(Equal(map[string]interface{}{"family": "FamilyName", "first": "FirstName", "age": int64(27)}))
+		Expect(testSpec["objectValue"]).Should(Equal(map[string]interface{}{"family": "FamilyName", "first": "FirstName", "age": int64(27)}))
 
 		By("copy stringJson2Value")
 		val, _ := sdk.Array2CSStringTransformer(strArray)
-		Ω(testSpec["stringJson2Value"]).Should(BeEquivalentTo(val))
-
+		Expect(testSpec["stringJson2Value"]).Should(BeEquivalentTo(val))
 	})
 	It("Composable should successfully update values of the output object", func() {
-
 		gvkIn := schema.GroupVersionKind{Kind: "InputValue", Version: "v1", Group: "test.ibmcloud.ibm.com"}
 		gvkOut := schema.GroupVersionKind{Kind: "OutputValue", Version: "v1", Group: "test.ibmcloud.ibm.com"}
 		objNamespacednameIn := types.NamespacedName{Namespace: "default", Name: "inputdata"}
 		objNamespacednameOut := types.NamespacedName{Namespace: testContext.Namespace(), Name: "comp-out"}
 
-		//unstrObj.SetGroupVersionKind(gvkOut)
+		// unstrObj.SetGroupVersionKind(gvkOut)
 		// First, the output object is created with default values, after that we deploy the inputObject and will check
 		// that all Output object filed are updated.
 		By("check that input object doesn't exist") // the object should not exist
 		unstrObj.SetGroupVersionKind(gvkIn)
-		Ω(test.GetUnstructuredObject(testContext, objNamespacednameIn, &unstrObj)()).Should(HaveOccurred())
+		Expect(test.GetUnstructuredObject(testContext, objNamespacednameIn, &unstrObj)()).Should(HaveOccurred())
 
 		By("check that output object doesn't exist. If it does => remove it ") // the object should not exist, or we delete it
 		unstrObj.SetGroupVersionKind(gvkOut)
@@ -188,14 +178,14 @@ var _ = Describe("test Composable operations", func() {
 		unstrObj.SetGroupVersionKind(gvkOut)
 		Eventually(test.GetUnstructuredObject(testContext, objNamespacednameOut, &unstrObj)).Should(Succeed())
 		testSpec, ok := unstrObj.Object[spec].(map[string]interface{})
-		Ω(ok).Should(BeTrue())
+		Expect(ok).Should(BeTrue())
 
 		// Check some of default the values
 		By("check default intValue")
-		Ω(testSpec["intValue"]).Should(BeEquivalentTo(10))
+		Expect(testSpec["intValue"]).Should(BeEquivalentTo(10))
 
 		By("check default stringFromBase64")
-		Ω(testSpec["stringFromBase64"]).Should(Equal("default"))
+		Expect(testSpec["stringFromBase64"]).Should(Equal("default"))
 
 		By("deploy input Object")
 		obj := test.LoadObject(dataDir+"inputDataObject.yaml", &unstructured.Unstructured{})
@@ -216,29 +206,29 @@ var _ = Describe("test Composable operations", func() {
 
 		// Check other values
 		By("check updated floatValue")
-		Ω(testSpec["floatValue"].(float64)).Should(BeEquivalentTo(23.5))
+		Expect(testSpec["floatValue"].(float64)).Should(BeEquivalentTo(23.5))
 
 		By("check updated boolValue")
-		Ω(testSpec["boolValue"]).Should(BeTrue())
+		Expect(testSpec["boolValue"]).Should(BeTrue())
 
 		By("check updated stringValue")
-		Ω(testSpec["stringValue"]).Should(Equal("Hello world"))
+		Expect(testSpec["stringValue"]).Should(Equal("Hello world"))
 
 		By("check updated stringFromBase64")
-		Ω(testSpec["stringFromBase64"]).Should(Equal("9376"))
+		Expect(testSpec["stringFromBase64"]).Should(Equal("9376"))
 
 		By("check updated arrayStrings")
-		Ω(testSpec["arrayStrings"]).Should(Equal(strArray))
+		Expect(testSpec["arrayStrings"]).Should(Equal(strArray))
 
 		By("check updated arrayIntegers")
-		Ω(testSpec["arrayIntegers"]).Should(Equal([]interface{}{int64(1), int64(2), int64(3), int64(4)}))
+		Expect(testSpec["arrayIntegers"]).Should(Equal([]interface{}{int64(1), int64(2), int64(3), int64(4)}))
 
 		By("check updated objectValue")
-		Ω(testSpec["objectValue"]).Should(Equal(map[string]interface{}{"family": "FamilyName", "first": "FirstName", "age": int64(27)}))
+		Expect(testSpec["objectValue"]).Should(Equal(map[string]interface{}{"family": "FamilyName", "first": "FirstName", "age": int64(27)}))
 
 		By("check updated stringJson2Value")
 		val, _ := sdk.Array2CSStringTransformer(strArray)
-		Ω(testSpec["stringJson2Value"]).Should(BeEquivalentTo(val))
+		Expect(testSpec["stringJson2Value"]).Should(BeEquivalentTo(val))
 	})
 })
 
@@ -270,7 +260,6 @@ var _ = Describe("Validate input objects Api grop and version discovery", func()
 		})
 
 		It("Composable should correctly discover required objects, core service without apiVersion", func() {
-
 			By("deploy Composable object " + "compServices.yaml")
 			comp := test.LoadComposable(dataDir + "compServices.yaml")
 			test.PostInNs(testContext, &comp, false, 0)
@@ -284,23 +273,14 @@ var _ = Describe("Validate input objects Api grop and version discovery", func()
 			unstrObj.SetGroupVersionKind(gvk)
 			Eventually(test.GetUnstructuredObject(testContext, objNamespacedname, &unstrObj)).Should(Succeed())
 			testSpec, ok := unstrObj.Object[spec].(map[string]interface{})
-			Ω(ok).Should(BeTrue())
+			Expect(ok).Should(BeTrue())
 
-			Ω(testSpec["k8sValue"]).Should(Equal("None"))
-			Ω(testSpec["testValue"]).Should(Equal("Test"))
+			Expect(testSpec["k8sValue"]).Should(Equal("None"))
+			Expect(testSpec["testValue"]).Should(Equal("Test"))
 		})
 
 		It("Composable should correctly discover required objects, , core service with apiVersion=v1", func() {
-
-			//By("deploy K8s Service")
-			//kubeObj := test.LoadObject(dataDir+"serviceK8s.yaml", &v1.Service{})
-			//test.CreateObject(testContext, kubeObj, false, 0)
-			//Eventually(test.GetObject(testContext, kubeObj)).ShouldNot(BeNil())
-			//
-			//By("deploy test Service")
-			//tObj := test.LoadObject(dataDir+"serviceTest.yaml", &unstructured.Unstructured{})
-			//test.CreateObject(testContext, tObj, false, 0)
-			//Eventually(test.GetObject(testContext, tObj)).ShouldNot(BeNil())
+			// Services referenced are deployed by a previous testcase already
 
 			By("deploy Composable object " + "compServicesV1.yaml")
 			comp := test.LoadComposable(dataDir + "compServicesV1.yaml")
@@ -315,14 +295,13 @@ var _ = Describe("Validate input objects Api grop and version discovery", func()
 			unstrObj.SetGroupVersionKind(gvk)
 			Eventually(test.GetUnstructuredObject(testContext, objNamespacedname, &unstrObj)).Should(Succeed())
 			testSpec, ok := unstrObj.Object[spec].(map[string]interface{})
-			Ω(ok).Should(BeTrue())
+			Expect(ok).Should(BeTrue())
 
-			Ω(testSpec["k8sValue"]).Should(Equal("None"))
-			Ω(testSpec["testValue"]).Should(Equal("Test"))
+			Expect(testSpec["k8sValue"]).Should(Equal("None"))
+			Expect(testSpec["testValue"]).Should(Equal("Test"))
 		})
 
 		It("Composable should fail to discover correct Service recourse, when there are several groups with the same Kind", func() {
-
 			By("deploy Composable object " + "compAPIError.yaml")
 			comp := test.LoadComposable(dataDir + "compAPIError.yaml")
 			test.PostInNs(testContext, &comp, false, 0)
@@ -333,10 +312,8 @@ var _ = Describe("Validate input objects Api grop and version discovery", func()
 
 			By("validate that Composable object status is FailedStatus")
 			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(FailedStatus))
-
 		})
-		It("Composable should fail to discover correct Service recourse, when a wring API version is provided", func() {
-
+		It("Composable should fail to discover correct Service recourse, when a wrong API version is provided", func() {
 			By("deploy Composable object " + "compAPIWrongVersionError.yaml")
 			comp := test.LoadComposable(dataDir + "compAPIWrongVersionError.yaml")
 			test.PostInNs(testContext, &comp, false, 0)
@@ -347,9 +324,7 @@ var _ = Describe("Validate input objects Api grop and version discovery", func()
 
 			By("validate that Composable object status is FailedStatus")
 			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(FailedStatus))
-
 		})
-
 	})
 })
 
@@ -375,7 +350,7 @@ var _ = Describe("Find input objects according their labels", func() {
 			test.DeleteObject(testContext, tObj, false)
 			Eventually(test.GetObject(testContext, tObj)).Should(BeNil())
 		})
-		It("Deployment should fail with the `neither 'name' nor 'labels' are not defined` error", func() {
+		It("Deployment should fail with the `neither 'name' nor 'labels' are defined (one expected)` error", func() {
 			By("deploy Composable object " + "compLabels.yaml" + " without name and labels")
 			comp := test.LoadComposable(dataDir + "compLabels.yaml")
 			unstrObj := unstructured.Unstructured{}
@@ -387,18 +362,18 @@ var _ = Describe("Find input objects according their labels", func() {
 			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(FailedStatus))
-			Ω(test.GetStatusMessage(testContext, &comp)()).Should(ContainSubstring("missing required field \"name\" or \"labels\""))
+			Expect(test.GetStatusMessage(testContext, &comp)()).Should(ContainSubstring("neither 'name' nor 'labels' are defined (one expected)"))
 			test.DeleteInNs(testContext, &comp, false)
 			Eventually(test.GetObject(testContext, &comp)).Should(BeNil())
 		})
 
-		It("Deployment should fail with the `both 'name' and 'labels' cannot be defined` error", func() {
+		It("Deployment should fail with the `bboth 'name' and 'labels' cannot be defined at the same time` error", func() {
 			By("deploy Composable object " + "compLabels.yaml" + " with both name and labels")
 			comp := test.LoadComposable(dataDir + "compLabels.yaml")
 			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(FailedStatus))
-			Ω(test.GetStatusMessage(testContext, &comp)()).Should(ContainSubstring("cannot specify both \"name\" and \"labels\""))
+			Expect(test.GetStatusMessage(testContext, &comp)()).Should(ContainSubstring("both 'name' and 'labels' cannot be defined at the same time"))
 			test.DeleteInNs(testContext, &comp, false)
 			Eventually(test.GetObject(testContext, &comp)).Should(BeNil())
 		})
@@ -421,7 +396,7 @@ var _ = Describe("Find input objects according their labels", func() {
 			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
 			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(FailedStatus))
-			Ω(test.GetStatusMessage(testContext, &comp)()).Should(ContainSubstring("list object returned 2 items"))
+			Expect(test.GetStatusMessage(testContext, &comp)()).Should(ContainSubstring("list object returned 2 items"))
 			test.DeleteInNs(testContext, &comp, false)
 			Eventually(test.GetObject(testContext, &comp)).Should(BeNil())
 			test.DeleteObject(testContext, tObj, false)
@@ -468,7 +443,6 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 
 	Context("create Service instance from ibmcloud.ibm.com WITHOUT external dependencies", func() {
 		It("should correctly create the Service instance", func() {
-
 			comp := test.LoadComposable(dataDir + "comp.yaml")
 			test.PostInNs(testContext, &comp, false, 0)
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
@@ -476,10 +450,8 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 			objNamespacedname := types.NamespacedName{Namespace: testContext.Namespace(), Name: "mymessagehub"}
 			unstrObj := unstructured.Unstructured{}
 			unstrObj.SetGroupVersionKind(groupVersionKind)
-			klog.V(5).Infof("Get Object %s\n", objNamespacedname)
 			Eventually(test.GetUnstructuredObject(testContext, objNamespacedname, &unstrObj)).Should(Succeed())
 			Eventually(test.GetStatusState(testContext, &comp)).Should(Equal(OnlineStatus))
-
 		})
 
 		It("should delete the Composable and Service instances", func() {
@@ -500,7 +472,6 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 				}).Should(BeTrue())
 			*/
 		})
-
 	})
 
 	Context("create Service instance from ibmcloud.ibm.com WITH external dependencies", func() {
@@ -527,11 +498,10 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 			By("get underlying object - Service.ibmcloud.ibm.com/v1alpha1")
 			unstrObj := unstructured.Unstructured{}
 			unstrObj.SetGroupVersionKind(groupVersionKind)
-			klog.V(5).Infof("Get Object %s\n", objNamespacedname)
 			Eventually(test.GetUnstructuredObject(testContext, objNamespacedname, &unstrObj)).Should(Succeed())
 
 			By("validate service plan")
-			Ω(getPlan(unstrObj.Object)).Should(Equal("standard"))
+			Expect(getPlan(unstrObj.Object)).Should(Equal("standard"))
 
 			By("Reload the Composable object")
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
@@ -558,11 +528,10 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 			By("get underlying object - Service.ibmcloud.ibm.com/v1alpha1")
 			unstrObj := unstructured.Unstructured{}
 			unstrObj.SetGroupVersionKind(groupVersionKind)
-			klog.V(5).Infof("Get Object %s\n", objNamespacedname)
 			Eventually(test.GetUnstructuredObject(testContext, objNamespacedname, &unstrObj)).Should(Succeed())
 
 			By("validate service plan")
-			Ω(getPlan(unstrObj.Object)).Should(Equal("standard"))
+			Expect(getPlan(unstrObj.Object)).Should(Equal("standard"))
 
 			By("Reload the Composable object")
 			Eventually(test.GetObject(testContext, &comp)).ShouldNot(BeNil())
@@ -575,7 +544,6 @@ var _ = Describe("IBM cloud-operators compatibility", func() {
 			Eventually(test.GetObject(testContext, &comp)).Should(BeNil())
 		})
 	})
-
 })
 
 // returns service plan of Service.ibmcloud.ibm.com

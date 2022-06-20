@@ -1,5 +1,7 @@
 # Composable SDK
 
+:warning: This is not up-to-date anymore!
+
 [![Build Status](https://travis-ci.com/IBM/composable.svg?branch=master)](https://travis-ci.com/IBM/composable)
 [![Go Report Card](https://goreportcard.com/badge/github.com/IBM/composable)](https://goreportcard.com/report/github.com/IBM/composable)
 [![GoDoc](https://godoc.org/github.com/IBM/composable/sdk?status.svg)](https://godoc.org/github.com/IBM/composable/sdk)

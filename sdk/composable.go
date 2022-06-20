@@ -1,4 +1,4 @@
-package v1
+package sdk
 
 import (
 	"context"
@@ -11,12 +11,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/discovery"
-	memory "k8s.io/client-go/discovery/cached"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/third_party/forked/golang/template"
 	"k8s.io/client-go/util/jsonpath"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/runtime/log"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 var logf = log.Log.WithName("composable-sdk")
@@ -85,17 +83,15 @@ func (k KubernetesResourceResolver) ResolveObject(ctx context.Context, object in
 // Resolve resolves an object and returns an Unstructured
 // This method assumes that the objMap is an object that has a metadata section with a namespace defined
 func resolve(ctx context.Context, r client.Client, discoveryClient discovery.ServerResourcesInterface, objMap map[string]interface{}, defaultNamespace string) (interface{}, error) {
-
-	cache := &ComposableCache{objects: make(map[string]interface{})}
-	obj, err := resolveFields(ctx, r, objMap, defaultNamespace, cache, discoveryClient)
+	obj, err := resolveFields(ctx, r, objMap, defaultNamespace, discoveryClient)
 	if err != nil {
 		return nil, err
 	}
-	//ret := unstructured.Unstructured{Object: obj.(map[string]interface{})}
+	// ret := unstructured.Unstructured{Object: obj.(map[string]interface{})}
 	return obj, nil
 }
 
-func resolveFields(ctx context.Context, r client.Client, fields interface{}, composableNamespace string, cache *ComposableCache, discoveryClient discovery.ServerResourcesInterface) (interface{}, error) {
+func resolveFields(ctx context.Context, r client.Client, fields interface{}, composableNamespace string, discoveryClient discovery.ServerResourcesInterface) (interface{}, error) {
 	switch fields.(type) {
 	case map[string]interface{}:
 		if fieldsOut, ok := fields.(map[string]interface{}); ok {
@@ -103,7 +99,7 @@ func resolveFields(ctx context.Context, r client.Client, fields interface{}, com
 				var newFields interface{}
 				var err error
 				if k == GetValueFrom {
-					newFields, err = resolveValue(ctx, r, v, composableNamespace, cache, discoveryClient)
+					newFields, err = resolveValue(ctx, r, v, composableNamespace, discoveryClient)
 					if err != nil {
 						logf.Info("resolveFields resolveValue 1", "err", err)
 						return nil, err
@@ -116,9 +112,9 @@ func resolveFields(ctx context.Context, r client.Client, fields interface{}, com
 							logf.Error(err, "resolveFields", "values", values)
 							return nil, err
 						}
-						newFields, err = resolveValue(ctx, r, value, composableNamespace, cache, discoveryClient)
+						newFields, err = resolveValue(ctx, r, value, composableNamespace, discoveryClient)
 					} else {
-						newFields, err = resolveFields(ctx, r, values, composableNamespace, cache, discoveryClient)
+						newFields, err = resolveFields(ctx, r, values, composableNamespace, discoveryClient)
 					}
 					if err != nil {
 						logf.Info("resolveFields resolveValue 2", "err", err)
@@ -127,7 +123,7 @@ func resolveFields(ctx context.Context, r client.Client, fields interface{}, com
 					fieldsOut[k] = newFields
 				} else if values, ok := v.([]interface{}); ok {
 					for i, value := range values {
-						newFields, err := resolveFields(ctx, r, value, composableNamespace, cache, discoveryClient)
+						newFields, err := resolveFields(ctx, r, value, composableNamespace, discoveryClient)
 						if err != nil {
 							return nil, err
 						}
@@ -140,7 +136,7 @@ func resolveFields(ctx context.Context, r client.Client, fields interface{}, com
 	case []map[string]interface{}, [][]interface{}:
 		if values, ok := fields.([]interface{}); ok {
 			for i, value := range values {
-				newFields, err := resolveFields(ctx, r, value, composableNamespace, cache, discoveryClient)
+				newFields, err := resolveFields(ctx, r, value, composableNamespace, discoveryClient)
 				if err != nil {
 					return nil, err
 				}
@@ -182,7 +178,7 @@ func groupQualifiedName(name, group string) string {
 }
 
 func lookupAPIResource(discoveryClient discovery.ServerResourcesInterface, objKind, apiVersion string) (*metav1.APIResource, error) {
-	//r.log.V(1).Info("lookupAPIResource", "objKind", objKind, "apiVersion", apiVersion)
+	log.Log.V(1).Info("lookupAPIResource", "objKind", objKind, "apiVersion", apiVersion)
 	var resources []*metav1.APIResourceList
 	var err error
 	if len(apiVersion) > 0 {
@@ -192,7 +188,7 @@ func lookupAPIResource(discoveryClient discovery.ServerResourcesInterface, objKi
 			return nil, err
 		}
 		resources = []*metav1.APIResourceList{list}
-		//	r.log.V(1).Info("lookupAPIResource", "list", list, "apiVersion", apiVersion)
+		log.Log.V(1).Info("lookupAPIResource", "list", list, "apiVersion", apiVersion)
 	} else {
 		resources, err = discoveryClient.ServerPreferredResources()
 		if err != nil {
@@ -247,8 +243,8 @@ Loop:
 	return nil, err
 }
 
-func resolveValue(ctx context.Context, r client.Client, value interface{}, composableNamespace string, cache *ComposableCache, discoveryClient discovery.ServerResourcesInterface) (interface{}, error) {
-	//r.log.Info("resolveValue", "value", value)
+func resolveValue(ctx context.Context, r client.Client, value interface{}, composableNamespace string, discoveryClient discovery.ServerResourcesInterface) (interface{}, error) {
+	// r.log.Info("resolveValue", "value", value)
 	var err error
 	if val, ok := value.(map[string]interface{}); ok {
 		if objKind, ok := val[kind].(string); ok {
@@ -259,7 +255,7 @@ func resolveValue(ctx context.Context, r client.Client, value interface{}, compo
 			if path, ok := val[path].(string); ok {
 				if strings.HasPrefix(path, "{.") {
 
-					unstrObj, err := getInputObject(ctx, r, val, objKind, apiversion, composableNamespace, cache, discoveryClient)
+					unstrObj, err := getInputObject(ctx, r, val, objKind, apiversion, composableNamespace, discoveryClient)
 					if err != nil {
 						if IsRefNotFound(err) {
 							// we have checked the object and did not find it
@@ -288,7 +284,7 @@ func resolveValue(ctx context.Context, r client.Client, value interface{}, compo
 	return nil, err
 }
 
-func getInputObject(ctx context.Context, r client.Client, val map[string]interface{}, objKind, apiversion, composableNamespace string, cache *ComposableCache, discoveryClient discovery.ServerResourcesInterface) (*unstructured.Unstructured, error) {
+func getInputObject(ctx context.Context, r client.Client, val map[string]interface{}, objKind, apiversion, composableNamespace string, discoveryClient discovery.ServerResourcesInterface) (*unstructured.Unstructured, error) {
 	res, err := lookupAPIResource(discoveryClient, objKind, apiversion)
 	if err != nil {
 		err := fmt.Errorf("%s, %s", err.Error(), kindNotFound)
@@ -308,27 +304,12 @@ func getInputObject(ctx context.Context, r client.Client, val map[string]interfa
 	intLabels, labelsOK := val[Labels].(map[string]interface{})
 	if nameOK == labelsOK { // only one of them should be defined
 		if nameOK && labelsOK {
-			err = fmt.Errorf("%s, %s", "GetValueFrom is not well-formed, both 'name' and 'labels' cannot be defined ", illFormedRef)
+			err = fmt.Errorf("%s, %s", "GetValueFrom is not well-formed, both 'name' and 'labels' cannot be defined at the same time", illFormedRef)
 		} else {
-			err = fmt.Errorf("%s, %s", "GetValueFrom is not well-formed, neither 'name' nor 'labels' are not defined ", illFormedRef)
+			err = fmt.Errorf("%s, %s", "GetValueFrom is not well-formed, neither 'name' nor 'labels' are defined (one expected)", illFormedRef)
 		}
 		logf.Error(err, "getInputObject", "val", val)
 		return nil, err
-	}
-	key := objectKey(name, ns, intLabels, groupVersionKind)
-	if obj, ok := cache.objects[key]; ok {
-		switch obj.(type) {
-		case unstructured.Unstructured:
-			unstrObj := obj.(unstructured.Unstructured)
-			return &unstrObj, nil
-		case toumbstone:
-			ts := obj.(toumbstone)
-			return nil, ts.err
-		default:
-			err = fmt.Errorf("wrong type of cached object %T", obj)
-			logf.Error(err, "")
-			return nil, err
-		}
 	}
 	var unstrObj unstructured.Unstructured
 	if nameOK {
@@ -344,10 +325,9 @@ func getInputObject(ctx context.Context, r client.Client, val map[string]interfa
 		if err != nil {
 			logf.Info("Get object returned ", "err", err, "obj", objNamespacedname)
 			err = fmt.Errorf("%s, %s", err.Error(), objectNotFound)
-			cache.objects[key] = toumbstone{err: err}
 			return nil, err
 		}
-	} else { //labelsOK
+	} else { // labelsOK
 		strLabels := make(map[string]string)
 		for key, value := range intLabels {
 			strValue := fmt.Sprintf("%v", value)
@@ -359,18 +339,15 @@ func getInputObject(ctx context.Context, r client.Client, val map[string]interfa
 		if err != nil {
 			logf.Info("list object returned ", "err", err, "namespace", ns, "labels", strLabels, "groupVersionKind", groupVersionKind)
 			err = fmt.Errorf("%s, %s", err.Error(), objectNotFound)
-			cache.objects[key] = toumbstone{err: err}
 			return nil, err
 		}
 		itms := len(unstrList.Items)
 		if itms == 1 {
 			unstrObj = unstrList.Items[0]
-			cache.objects[key] = unstrObj
 		} else {
 			err = fmt.Errorf("list object returned %d items ", itms)
 			logf.Error(err, "wrong # of items", "items", itms, "namespace", Namespace, "labels", strLabels, "groupVersionKind", groupVersionKind)
 			err = fmt.Errorf("%s, %s", err.Error(), objectNotFound)
-			cache.objects[key] = toumbstone{err: err}
 			return nil, err
 		}
 	}
@@ -424,10 +401,6 @@ func errorToDefaultValue(val map[string]interface{}, err error) (interface{}, er
 		return defaultValue, nil
 	}
 	return nil, err
-}
-
-func getDiscoveryClient(cfg *rest.Config) discovery.CachedDiscoveryInterface {
-	return memory.NewMemCacheClient(discovery.NewDiscoveryClientForConfigOrDie(cfg))
 }
 
 func objectKey(name string, namespace string, labels map[string]interface{}, gvk schema.GroupVersionKind) string {

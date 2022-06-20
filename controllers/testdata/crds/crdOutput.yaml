@@ -1,4 +1,4 @@
-apiVersion: apiextensions.k8s.io/v1beta1
+apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   # name must match the spec fields below, and be in the form: <plural>.<group>
@@ -7,7 +7,6 @@ spec:
   # group name to use for REST API: /apis/<group>/<version>
   group: test.ibmcloud.ibm.com
   # list of versions supported by this CustomResourceDefinition
-  version: v1
   # either Namespaced or Cluster
   scope: Namespaced
   names:
@@ -20,35 +19,38 @@ spec:
     # shortNames allow shorter string to match your resource on the CLI
     shortNames:
     - outval
-  # preserveUnknownFields: false
-  validation:
-    openAPIV3Schema:
-      type: object
-      properties:
-        spec:
-          type: object
-          properties:
-            intValue:
-              type: integer
-            floatValue:
-                type: number
-            boolValue:
-                type: boolean
-            stringValue:
-                type: string
-            stringFromBase64:
-                type: string
-            arrayStrings:
-              type: array
-              items:
-                type: string
-            arrayIntegers:
-              type: array
-              items:
+  versions:
+  - name: v1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+            properties:
+              intValue:
                 type: integer
-            objectValue:
-              type: object
-            stringJson2Value:
-                type: string
-
-
+              floatValue:
+                  type: number
+              boolValue:
+                  type: boolean
+              stringValue:
+                  type: string
+              stringFromBase64:
+                  type: string
+              arrayStrings:
+                type: array
+                items:
+                  type: string
+              arrayIntegers:
+                type: array
+                items:
+                  type: integer
+              objectValue:
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+              stringJson2Value:
+                  type: string
