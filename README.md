@@ -1,4 +1,5 @@
-[![Build Status](https://travis-ci.com/IBM/composable.svg?branch=master)](https://travis-ci.com/IBM/composable)
+![Build Status](https://github.com/composable-operator/composable/actions/workflows/release.yaml/badge.svg)
+![Test](https://github.com/composable-operator/composable/actions/workflows/test.yaml/badge.svg)
 [![Go Report Card](https://goreportcard.com/badge/github.com/composable-operator/composable)](https://goreportcard.com/report/github.com/composable-operator/composable)
 [![GoDoc](https://godoc.org/github.com/composable-operator/composable?status.svg)](https://godoc.org/github.com/composable-operator/composable)
 
