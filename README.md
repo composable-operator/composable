@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.com/IBM/composable.svg?branch=master)](https://travis-ci.com/IBM/composable)
-[![Go Report Card](https://goreportcard.com/badge/github.com/IBM/composable)](https://goreportcard.com/report/github.com/IBM/composable)
-[![GoDoc](https://godoc.org/github.com/IBM/composable?status.svg)](https://godoc.org/github.com/IBM/composable)
+[![Go Report Card](https://goreportcard.com/badge/github.com/composable-operator/composable)](https://goreportcard.com/report/github.com/composable-operator/composable)
+[![GoDoc](https://godoc.org/github.com/composable-operator/composable?status.svg)](https://godoc.org/github.com/composable-operator/composable)
 
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
