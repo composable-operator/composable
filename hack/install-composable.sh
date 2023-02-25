@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Copyright 2019 IBM Corp. All Rights Reserved.
 #
@@ -20,20 +20,21 @@
 
 set -e
 
-RELEASE="latest/"
+#
+# This will clone the composable-operator/composable git repo to the director
+# where this script is located, and install the kustomize resources in config/default
+#
 
-# check if running piped from curl
-if [ -z ${BASH_SOURCE} ]; then
-  echo "* Downloading install yaml..."
-  rm -rf /tmp/ibm-composable && mkdir -p /tmp/ibm-composable
-  cd /tmp/ibm-composable
-  curl -sLJO https://github.com/IBM/composable/archive/master.zip
-  unzip -qq composable-master.zip
-  cd composable-master
-  SCRIPTS_HOME=${PWD}/hack
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+gitdir="${SCRIPT_DIR}/composable"
+
+if [[ ! -d "${gitdir}" ]]; then
+  git -C "${SCRIPT_DIR}" clone git@github.com:composable-operator/composable.git
 else
-  SCRIPTS_HOME=$(dirname ${BASH_SOURCE})
+  git -C "${gitdir}" pull
 fi
 
-# install the operator
-kubectl apply -f ${SCRIPTS_HOME}/../releases/${RELEASE}
+echo "Installing composable-operator"
+
+kubectl apply -k "${gitdir}/config/default/"
