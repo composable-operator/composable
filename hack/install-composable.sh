@@ -32,7 +32,7 @@ gitdir="${SCRIPT_DIR}/composable"
 if [[ ! -d "${gitdir}" ]]; then
   git -C "${SCRIPT_DIR}" clone git@github.com:composable-operator/composable.git
 else
-  git -C "${gitdir}" pull
+  git -C "${gitdir}" pull --autostash
 fi
 
 echo "Installing composable-operator"
