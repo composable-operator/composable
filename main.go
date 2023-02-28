@@ -57,6 +57,7 @@ func main() {
 	var developmentMode bool
 	var probeAddr string
 	var syncPeriod time.Duration
+	var queriesPerSecond float32
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -65,6 +66,7 @@ func main() {
 	flag.BoolVar(&developmentMode, "development-mode", false, "Enable development mode")
 	flag.DurationVar(&syncPeriod, "sync-period", 60*time.Second, "Sync period")
 	flag.Int("max-concurrent-reconciles", 1, "Maximum number of concurrent reconciles for controllers.")
+	flag.Float32Var(&queriesPerSecond, "queries-per-second", 300.0, "Maximum number of queries per second made by the reconciler client.")
 	viper.BindPFlag("max-concurrent-reconciles", flag.Lookup("max-concurrent-reconciles"))
 	flag.Parse()
 
@@ -88,7 +90,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	reconciler := controllers.NewReconciler(mgr)
+	reconciler := controllers.NewReconciler(mgr, controllers.ReconcilerOptions{
+		QueriesPerSecond: queriesPerSecond,
+	})
 	if err = reconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Composable")
 		os.Exit(1)

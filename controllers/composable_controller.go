@@ -69,6 +69,10 @@ type ComposableReconciler struct {
 	Resolver   sdk.ResolveObject
 }
 
+type ReconcilerOptions struct {
+	QueriesPerSecond float32
+}
+
 // ManagerSettableReconciler - a Reconciler that can be added to a Manager
 type ManagerSettableReconciler interface {
 	reconcile.Reconciler
@@ -76,8 +80,9 @@ type ManagerSettableReconciler interface {
 }
 
 // NewReconciler ...
-func NewReconciler(mgr ctrl.Manager) ManagerSettableReconciler {
+func NewReconciler(mgr ctrl.Manager, opts ReconcilerOptions) ManagerSettableReconciler {
 	cfg := mgr.GetConfig()
+	cfg.QPS = opts.QueriesPerSecond
 	return &ComposableReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
@@ -96,9 +101,9 @@ func (r *ComposableReconciler) setController(controller controller.Controller) {
 	r.Controller = controller
 }
 
-//+kubebuilder:rbac:groups=ibmcloud.ibm.com,resources=composables,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=ibmcloud.ibm.com,resources=composables/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=ibmcloud.ibm.com,resources=composables/finalizers,verbs=update
+// +kubebuilder:rbac:groups=ibmcloud.ibm.com,resources=composables,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=ibmcloud.ibm.com,resources=composables/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=ibmcloud.ibm.com,resources=composables/finalizers,verbs=update
 func (r *ComposableReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx).WithValues("composable", req.NamespacedName)
 
