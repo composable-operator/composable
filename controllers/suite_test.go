@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ibm/composable/controllers/test"
+	"github.com/composable-operator/composable/controllers/test"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -33,7 +33,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	ibmcloudv1alpha1 "github.com/ibm/composable/api/v1alpha1"
+	ibmcloudv1alpha1 "github.com/composable-operator/composable/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 

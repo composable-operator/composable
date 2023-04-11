@@ -34,8 +34,8 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
-	ibmcloudv1alpha1 "github.com/ibm/composable/api/v1alpha1"
-	"github.com/ibm/composable/controllers"
+	ibmcloudv1alpha1 "github.com/composable-operator/composable/api/v1alpha1"
+	"github.com/composable-operator/composable/controllers"
 	//+kubebuilder:scaffold:imports
 )
 

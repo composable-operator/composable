@@ -2,7 +2,7 @@
 package v1alpha1
 
 import (
-	sdk "github.com/ibm/composable/sdk"
+	sdk "github.com/composable-operator/composable/sdk"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

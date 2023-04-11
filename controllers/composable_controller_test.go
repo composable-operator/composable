@@ -17,8 +17,8 @@
 package controllers
 
 import (
-	"github.com/ibm/composable/controllers/test"
-	sdk "github.com/ibm/composable/sdk"
+	"github.com/composable-operator/composable/controllers/test"
+	sdk "github.com/composable-operator/composable/sdk"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"

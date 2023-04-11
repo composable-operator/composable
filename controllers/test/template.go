@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/ibm/composable/api/v1alpha1"
+	"github.com/composable-operator/composable/api/v1alpha1"
 )
 
 // PostInNs the object

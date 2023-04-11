@@ -2,7 +2,7 @@ domain: ibm.com
 layout:
 - go.kubebuilder.io/v3
 projectName: composable
-repo: github.com/ibm/composable
+repo: github.com/composable-operator/composable
 resources:
 - api:
     crdVersion: v1
@@ -11,7 +11,7 @@ resources:
   domain: ibm.com
   group: ibmcloud
   kind: Composable
-  path: github.com/ibm/composable/api/v1alpha1
+  path: github.com/composable-operator/composable/api/v1alpha1
   version: v1alpha1
   webhooks:
     defaulting: true

@@ -3,8 +3,8 @@
 :warning: This is not up-to-date anymore!
 
 [![Build Status](https://travis-ci.com/IBM/composable.svg?branch=master)](https://travis-ci.com/IBM/composable)
-[![Go Report Card](https://goreportcard.com/badge/github.com/IBM/composable)](https://goreportcard.com/report/github.com/IBM/composable)
-[![GoDoc](https://godoc.org/github.com/IBM/composable/sdk?status.svg)](https://godoc.org/github.com/IBM/composable/sdk)
+[![Go Report Card](https://goreportcard.com/badge/github.com/composable-operator/composable)](https://goreportcard.com/report/github.com/composable-operator/composable)
+[![GoDoc](https://godoc.org/github.com/composable-operator/composable/sdk?status.svg)](https://godoc.org/github.com/composable-operator/composable/sdk)
 
 Kubernetes object specifications often require constant values for their fields. When deploying an entire application
 with many different resources, this limitation often results in the need for staged deployments, because some resources
@@ -22,7 +22,7 @@ See this [tutorial](./docs/tutorial.md), in which we add cross-references to the
 
 To install, run:
 ```
-go get github.com/ibm/composable/sdk
+go get github.com/composable-operator/composable/sdk
 ```
 
 ## Types
@@ -46,7 +46,7 @@ type ComposableGetValueFrom struct {
 ```
 
 An `ObjectRef` can be used to specify the type of any field of a CRD definition, allowing the value to be determined dynamically.
-For a detailed explanation of how to specify an object reference according to this schema, see [here](https://github.com/IBM/composable/blob/master/README.md#getvaluefrom-elements).
+For a detailed explanation of how to specify an object reference according to this schema, see [here](https://github.com/composable-operator/composable/blob/master/README.md#getvaluefrom-elements).
 
 The Composable SDK offers the following types to be used as part of a Reconciler in a controller:
 

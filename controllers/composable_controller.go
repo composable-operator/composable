@@ -37,8 +37,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	ibmcloudv1alpha1 "github.com/ibm/composable/api/v1alpha1"
-	sdk "github.com/ibm/composable/sdk"
+	ibmcloudv1alpha1 "github.com/composable-operator/composable/api/v1alpha1"
+	sdk "github.com/composable-operator/composable/sdk"
 	"github.com/spf13/viper"
 )
 

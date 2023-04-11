@@ -1,4 +1,4 @@
-module github.com/ibm/composable
+module github.com/composable-operator/composable
 
 go 1.17
 

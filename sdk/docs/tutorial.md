@@ -28,7 +28,7 @@ type MemcachedSpec struct {
 We modify this `struct` as shown below:
 ```golang
 import (
-	sdk "github.com/ibm/composable/sdk"
+	sdk "github.com/composable-operator/composable/sdk"
 	...
 )
 
@@ -58,7 +58,7 @@ type ComposableGetValueFrom struct {
 }
 ```
 
-For a detailed explanation of how to specify an object reference according to this schema, see [here](https://github.com/IBM/composable/blob/master/README.md#getvaluefrom-elements).
+For a detailed explanation of how to specify an object reference according to this schema, see [here](https://github.com/composable-operator/composable/blob/master/README.md#getvaluefrom-elements).
 
 Given the new specification for `Memcached`, a sample CR can be written as:
 ```yaml
