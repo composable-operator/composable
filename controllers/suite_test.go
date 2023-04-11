@@ -95,7 +95,7 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
-	err = (NewReconciler(k8sManager)).SetupWithManager(k8sManager)
+	err = (NewReconciler(k8sManager, ReconcilerOptions{QueriesPerSecond: 300.0})).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	go func() {
